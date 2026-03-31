@@ -5,7 +5,8 @@
   "type": "module",
   "bin": {
     "163news": "./dist/cli.js",
-    "163newscli": "./dist/cli.js"
+    "163newscli": "./dist/cli.js",
+    "163news-mcp": "./dist/mcp-server.js"
   },
   "scripts": {
     "dev": "node --loader ts-node/esm src/cli.tsx",
@@ -14,6 +15,7 @@
     "test": "node harness.test.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "axios": "^1.6.0",
     "figlet": "^1.11.0",
     "ink": "^4.4.1",
@@ -23,7 +25,8 @@
     "node-html-parser": "^6.1.13",
     "playwright": "^1.58.2",
     "react": "^18.2.0",
-    "wrap-ansi": "^9.0.0"
+    "wrap-ansi": "^9.0.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",

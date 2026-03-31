@@ -20,58 +20,128 @@
 - 💰 **财经** — 股市行情，商业新闻
 - 🚗 **汽车** — 新车发布，购车指南
 - 📖 **文章全文** — 直接在终端阅读完整正文
+- 💬 **评论浏览** — 热门评论 + 盖楼回复，支持回复和点赞
 
 ## 安装
 
 ```bash
-npm install -g 163news-cli
+npm install -g 163newscli
 ```
 
-或本地运行：
+安装后可以用以下命令启动：
 
 ```bash
-git clone https://github.com/yisudong/163newscli.git
-cd 163newscli
-npm install
-npm run build
-node dist/cli.js
+163news      # 或
+163newscli
 ```
 
 ## 使用
 
-```bash
-163news
-```
+### TUI 模式（终端交互界面）
 
-### 键盘操作
+```bash
+163newscli
+```
 
 | 按键 | 功能 |
 |------|------|
-| `↑` / `↓` | 上下移动光标 |
+| `↑` / `↓` / `j` / `k` | 上下移动光标 |
 | `Enter` | 进入 / 阅读文章 |
 | `q` / `Esc` | 返回上一级 |
-| `j` / `k` | 向下 / 向上滚动文章 |
+| `d` / `u` | 半页下滚 / 上滚 |
+| `c` | 切换正文 / 评论 |
+| `r` | 回复当前高亮评论（需登录） |
+| `v` | 点赞当前高亮评论（需登录） |
+| `f` | 刷新评论 |
+| `l` | 登录 / 退出登录 |
+
+---
+
+## MCP Server 模式
+
+将 163news 作为 **MCP Server** 接入 Claude Code、Cursor、Zed 等支持 MCP 的 AI 工具，在对话中直接读新闻。
+
+### 提供的工具
+
+| 工具名 | 说明 |
+|--------|------|
+| `get_hot_news` | 获取实时热搜榜（最多100条） |
+| `get_channel_news` | 获取指定频道新闻（热搜/要闻/娱乐/体育/财经等） |
+| `get_article` | 根据 docid 读取文章全文 |
+| `get_comments` | 获取文章热门评论 |
+
+### 配置方法
+
+**Claude Code（推荐）**：
+
+编辑 `~/.claude/mcp.json`（若不存在则新建）：
+
+```json
+{
+  "mcpServers": {
+    "163news": {
+      "command": "163news-mcp"
+    }
+  }
+}
+```
+
+**Cursor**：
+
+打开 `Settings → MCP` 或编辑 `~/.cursor/mcp.json`：
+
+```json
+{
+  "mcpServers": {
+    "163news": {
+      "command": "163news-mcp"
+    }
+  }
+}
+```
+
+**直接用 npx（无需全局安装）**：
+
+```json
+{
+  "mcpServers": {
+    "163news": {
+      "command": "npx",
+      "args": ["-y", "163newscli/dist/mcp-server.js"]
+    }
+  }
+}
+```
+
+配置好后，重启 IDE，在对话中直接问：
+
+> "今天网易热搜是什么？"  
+> "帮我读一下这篇文章 [docid]"  
+> "这篇新闻的评论怎么说？"
+
+---
 
 ## 技术栈
 
 - **Node.js** + **TypeScript**
 - **Ink** — React TUI 框架，构建终端 UI
 - **Axios** — HTTP 请求
-- **node-html-parser** — HTML 解析
+- **Playwright** — 浏览器自动化（登录 / 回复 / 点赞）
+- **MCP SDK** — Model Context Protocol，AI 工具集成
 
 ## 数据来源
 
-抓取 `m.163.com` 页面中的 `window.__INITIAL_STATE__` 状态数据，文章详情来自 `c.m.163.com` JSON 接口，均为公开可访问的接口。
+抓取 `m.163.com` 页面中的 `window.__INITIAL_STATE__` 状态数据，文章详情来自 `c.m.163.com` JSON 接口，评论来自 `comment.api.163.com`，均为公开可访问的接口。
 
 ## 开发
 
 ```bash
 npm install
-npm run dev    # 监听模式编译
 npm run build  # 生产构建
-npm test       # 运行 Harness 测试套件
+npm test       # 运行 Harness 测试套件（126条）
 ```
 
 ## License
 
 MIT
+
