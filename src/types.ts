@@ -1,0 +1,32 @@
+// 类型定义
+export interface NewsItem {
+  docid: string;
+  title: string;
+  digest: string;
+  source: string;
+  ptime: string;
+  imgsrc?: string;
+  url?: string;
+  replyCount?: number;
+}
+
+export interface ArticleDetail {
+  docid: string;
+  title: string;
+  source: string;
+  ptime: string;
+  body: string;           // HTML 正文
+  digest?: string;
+  shareLink?: string;
+  ipLocation?: string;
+  wordsCount?: number;
+}
+
+export type ChannelKey = 'hot' | 'news' | 'ent' | 'sports' | 'money' | 'auto' | 'tech' | 'mil';
+
+export interface Channel {
+  key: ChannelKey;
+  label: string;
+  path: string;
+  storeKey: string;
+}
