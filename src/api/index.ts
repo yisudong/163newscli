@@ -163,6 +163,7 @@ export async function fetchComments(docid: string, limit = 20): Promise<Comment[
         vote: c.vote ?? 0,
         createTime: c.createTime || '',
         ip: c.ip || '',
+        branches: typeof c.branches === 'number' ? c.branches : 0,
       }));
   } catch {
     return [];

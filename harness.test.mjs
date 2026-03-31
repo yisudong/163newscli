@@ -106,6 +106,7 @@ function assert(name, cond, detail = '') {
   assert('NewsList 使用 padEndWidth 而非 padEnd', listSrc.includes('padEndWidth') && !listSrc.includes('.padEnd('));
   assert('ArticleView 撑满高度 height={termHeight}', articleSrc.includes('height: termHeight'));
   assert('ArticleView 正文区有 overflow hidden', articleSrc.includes('overflow') && articleSrc.includes('hidden'));
+  assert('ArticleView 评论行使用 padEndWidth 而非 padEnd', articleSrc.includes('padEndWidth') && !articleSrc.includes('.padEnd('));
 
   // ---- TEST 8: 菜单项 emoji 宽度一致性 ----
   console.log('\n📋 [8] 菜单 emoji 宽度一致性');
@@ -132,6 +133,10 @@ function assert(name, cond, detail = '') {
   assert('ArticleView 有 fetchComments 引用', articleSrc.includes('fetchComments'));
   assert('ArticleView c 键切换评论', articleSrc.includes("'c'") || articleSrc.includes('"c"'));
   assert('ArticleDetail 含 replyCount 字段', articleSrc.includes('replyCount'));
+  assert('ArticleView 评论 branches 子评论提示', articleSrc.includes('branches'));
+  if (cmts.length > 0) {
+    assert('评论 branches 字段为数字', typeof cmts[0].branches === 'number');
+  }
 
   // ---- 汇总 ----
   console.log('\n' + '='.repeat(50));

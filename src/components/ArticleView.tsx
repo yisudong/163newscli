@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text, useInput, useStdout } from 'ink';
 import { exec } from 'child_process';
 import type { ArticleDetail, Comment } from '../types.js';
-import { htmlToText, wrapText, formatTime, truncate } from '../utils/text.js';
+import { htmlToText, wrapText, formatTime, truncate, padEndWidth, displayWidth } from '../utils/text.js';
 import { fetchComments } from '../api/index.js';
 
 interface ArticleViewProps {
@@ -161,12 +161,13 @@ export function ArticleView({ article, loading, onBack }: ArticleViewProps) {
               ) : (
                 visibleComments.map((c, i) => (
                   <Box key={c.commentId} paddingX={1}>
-                    <Text color="cyan">{truncate(c.nickName, nameWidth).padEnd(nameWidth, ' ')}</Text>
+                    <Text color="cyan">{padEndWidth(truncate(c.nickName, nameWidth), nameWidth)}</Text>
                     <Text> </Text>
-                    <Text>{truncate(c.content, cmtContentWidth).padEnd(cmtContentWidth, ' ')}</Text>
+                    <Text>{padEndWidth(truncate(c.content, cmtContentWidth), cmtContentWidth)}</Text>
                     <Text> </Text>
-                    <Text color="gray">{String(c.vote > 0 ? `👍${c.vote}` : '').padEnd(voteWidth, ' ')}</Text>
+                    <Text color="gray">{padEndWidth(c.vote > 0 ? `👍${c.vote}` : '', voteWidth)}</Text>
                     <Text color="gray"> {c.createTime.slice(5, 16)}</Text>
+                    {(c.branches ?? 0) > 0 && <Text color="gray"> 💬{c.branches}</Text>}
                   </Box>
                 ))
               )}

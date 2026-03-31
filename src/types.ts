@@ -6,6 +6,7 @@ export interface Comment {
   vote: number;
   createTime: string;
   ip?: string;
+  branches?: number;
 }
 
 export interface NewsItem {
