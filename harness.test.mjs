@@ -36,6 +36,19 @@ function assert(name, cond, detail = '') {
     assert(`频道[${ch.label}]标题非空`, (items[0]?.title?.length ?? 0) > 0);
   }
 
+  // ---- TEST 3b: API - 新增频道 ----
+  console.log('\n📋 [3b] API: 新增频道数据');
+  const newChannelKeys = ['game', 'edu', 'jiankang', 'fashion'];
+  for (const key of newChannelKeys) {
+    const ch = CHANNELS.find(c => c.key === key);
+    assert(`新频道[${key}]存在于 CHANNELS`, ch !== undefined);
+    if (ch) {
+      const items = await fetchChannel(ch);
+      assert(`新频道[${key}]条数>5`, items.length > 5, `实际:${items.length}`);
+      assert(`新频道[${key}]标题非空`, (items[0]?.title?.length ?? 0) > 0);
+    }
+  }
+
   // ---- TEST 4: API - 文章详情 ----
   console.log('\n📋 [4] API: 文章详情');
   const art = await fetchArticle(hot[0].docid);
@@ -96,6 +109,7 @@ function assert(name, cond, detail = '') {
 
   // ---- TEST 8: 菜单项 emoji 宽度一致性 ----
   console.log('\n📋 [8] 菜单 emoji 宽度一致性');
+  assert('CHANNELS 共10个频道', CHANNELS.length === 10);
   assert('体育频道不使用窄 emoji ⚽', !CHANNELS.find(c => c.key === 'sports')?.label.includes('⚽'));
   const labelWidths = CHANNELS.slice(1).map(ch => {
     let w = 0; for (const c of ch.label) w += c.codePointAt(0) > 0xFFFF ? 2 : (c.charCodeAt(0) > 127 ? 2 : 1);

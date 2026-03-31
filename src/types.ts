@@ -22,7 +22,7 @@ export interface ArticleDetail {
   wordsCount?: number;
 }
 
-export type ChannelKey = 'hot' | 'news' | 'ent' | 'sports' | 'money' | 'auto' | 'tech' | 'mil';
+export type ChannelKey = 'hot' | 'news' | 'ent' | 'sports' | 'money' | 'auto' | 'game' | 'edu' | 'jiankang' | 'fashion';
 
 export interface Channel {
   key: ChannelKey;

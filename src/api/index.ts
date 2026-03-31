@@ -9,12 +9,16 @@ const http = axios.create({
 });
 
 export const CHANNELS: Channel[] = [
-  { key: 'hot',    label: '🔥 热搜榜', path: 'hot',    storeKey: 'hotFlowNews' },
-  { key: 'news',   label: '📰 要闻',   path: 'news',   storeKey: 'homeArticleList' },
-  { key: 'ent',    label: '🎬 娱乐',   path: 'ent',    storeKey: 'homeArticleList' },
-  { key: 'sports', label: '🏅 体育',   path: 'sports', storeKey: 'homeArticleList' },
-  { key: 'money',  label: '💰 财经',   path: 'money',  storeKey: 'homeArticleList' },
-  { key: 'auto',   label: '🚗 汽车',   path: 'auto',   storeKey: 'homeArticleList' },
+  { key: 'hot',      label: '🔥 热搜榜', path: 'hot',      storeKey: 'hotFlowNews' },
+  { key: 'news',     label: '📰 要闻',   path: 'news',     storeKey: 'homeArticleList' },
+  { key: 'ent',      label: '🎬 娱乐',   path: 'ent',      storeKey: 'homeArticleList' },
+  { key: 'sports',   label: '🏅 体育',   path: 'sports',   storeKey: 'homeArticleList' },
+  { key: 'money',    label: '💰 财经',   path: 'money',    storeKey: 'homeArticleList' },
+  { key: 'auto',     label: '🚗 汽车',   path: 'auto',     storeKey: 'homeArticleList' },
+  { key: 'game',     label: '🎮 游戏',   path: 'game',     storeKey: 'homeArticleList' },
+  { key: 'edu',      label: '🎓 教育',   path: 'edu',      storeKey: 'homeArticleList' },
+  { key: 'jiankang', label: '💊 健康',   path: 'jiankang', storeKey: 'homeArticleList' },
+  { key: 'fashion',  label: '👗 时尚',   path: 'fashion',  storeKey: 'homeArticleList' },
 ];
 
 /**
