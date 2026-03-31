@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text, useInput, useStdout } from 'ink';
 import type { NewsItem } from '../types.js';
-import { formatTime, truncate } from '../utils/text.js';
+import { formatTime, truncate, padEndWidth } from '../utils/text.js';
 
 interface NewsListProps {
   title: string;
@@ -100,9 +100,10 @@ export function NewsList({ title, items, loading, onSelect, onBack, onRefresh }:
             const isSelected = realIndex === cursor;
             const timeStr = formatTime(item.ptime);
             const indexStr = String(realIndex + 1).padStart(3, ' ');
-            // 标题宽度 = 终端宽 - 序号(4) - 来源(10) - 时间(12) - 间距(4)
-            const titleWidth = Math.max(20, termWidth - 32);
+            // 固定列：paddingX(2) + index+space(4) + source(10) + time(9) = 25
+            const titleWidth = Math.max(10, termWidth - 25);
             const titleStr = truncate(item.title, titleWidth);
+            const sourceStr = truncate(item.source, 8);
 
             return (
               <Box key={item.docid} paddingX={1}>
@@ -111,9 +112,9 @@ export function NewsList({ title, items, loading, onSelect, onBack, onRefresh }:
                   backgroundColor={isSelected ? 'cyan' : undefined}
                 >
                   <Text color={isSelected ? 'black' : 'gray'}>{indexStr} </Text>
-                  <Text bold={isSelected}>{titleStr.padEnd(titleWidth, ' ')}</Text>
+                  <Text bold={isSelected}>{padEndWidth(titleStr, titleWidth)}</Text>
                   <Text color={isSelected ? 'black' : 'gray'}>
-                    {' '}{truncate(item.source, 8).padEnd(9, ' ')}
+                    {' '}{padEndWidth(sourceStr, 9)}
                   </Text>
                   <Text color={isSelected ? 'black' : 'gray'}>
                     {' '}{timeStr}

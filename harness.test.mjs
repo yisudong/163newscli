@@ -10,7 +10,7 @@ function assert(name, cond, detail = '') {
 
 (async () => {
   const { fetchHot, fetchChannel, fetchArticle, CHANNELS } = await import('./dist/api/index.js');
-  const { htmlToText, wrapText, formatTime, truncate } = await import('./dist/utils/text.js');
+  const { htmlToText, wrapText, formatTime, truncate, padEndWidth, displayWidth } = await import('./dist/utils/text.js');
   const fs = await import('fs');
 
   // ---- TEST 1: Banner 验证 ----
@@ -58,6 +58,15 @@ function assert(name, cond, detail = '') {
     for (const c of l) w += c.charCodeAt(0) > 127 ? 2 : 1;
     return w <= 10;
   }));
+  assert('padEndWidth 中文补齐到目标宽度', (() => {
+    const s = padEndWidth('你好', 10);
+    return displayWidth(s) === 10;
+  })());
+  assert('padEndWidth 不超出目标宽度', (() => {
+    const s = padEndWidth('这是一段已经很宽的中文字符串测试', 8);
+    return displayWidth(s) >= 8;
+  })());
+  assert('padEndWidth ASCII正常补齐', padEndWidth('hi', 6) === 'hi    ');
 
   // ---- TEST 6: stale closure 修复验证（静态分析）----
   console.log('\n📋 [6] stale closure 修复验证');
@@ -68,6 +77,16 @@ function assert(name, cond, detail = '') {
   const articleSrc = fs.readFileSync('./dist/components/ArticleView.js', 'utf8');
   assert('ArticleView 使用 linesRef', articleSrc.includes('linesRef'));
   assert('ArticleView 使用 loadingRef', articleSrc.includes('loadingRef'));
+
+  // ---- TEST 7: 终端高度/宽度适配验证（静态分析）----
+  console.log('\n📋 [7] 终端尺寸适配验证');
+  assert('Menu 使用 termHeight', menuSrc.includes('termHeight'));
+  assert('Menu 撑满高度 height={termHeight}', menuSrc.includes('height: termHeight'));
+  assert('Menu 垂直居中 justifyContent center', menuSrc.includes('justifyContent') && menuSrc.includes('center'));
+  assert('NewsList 撑满高度 height={termHeight}', listSrc.includes('height: termHeight'));
+  assert('NewsList 使用 padEndWidth 而非 padEnd', listSrc.includes('padEndWidth') && !listSrc.includes('.padEnd('));
+  assert('ArticleView 撑满高度 height={termHeight}', articleSrc.includes('height: termHeight'));
+  assert('ArticleView 正文区有 overflow hidden', articleSrc.includes('overflow') && articleSrc.includes('hidden'));
 
   // ---- 汇总 ----
   console.log('\n' + '='.repeat(50));

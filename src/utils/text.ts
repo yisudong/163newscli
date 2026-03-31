@@ -94,6 +94,12 @@ export function displayWidth(str: string): number {
   return width;
 }
 
+export function padEndWidth(str: string, targetWidth: number): string {
+  const current = displayWidth(str);
+  const pad = Math.max(0, targetWidth - current);
+  return str + ' '.repeat(pad);
+}
+
 /**
  * 将文章正文按终端宽度折行
  */
