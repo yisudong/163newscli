@@ -212,9 +212,29 @@ function assert(name, cond, detail = '') {
   assert('ArticleView 状态栏包含 f 刷新提示', articleSrc.includes('f 刷新'));
   assert('ArticleView 暂无评论提示用 f 刷新', articleSrc.includes('\\u6309 f \\u5237\\u65B0') || articleSrc.includes('按 f 刷新'));
   assert('ArticleView 有 replyStatus 显示区域', articleSrc.includes('replyStatus') && articleSrc.includes('成功'));
-  assert('ArticleView replyStatus 内联在状态栏（不单独占行）', !articleSrc.includes('replyStatus ? (React.createElement(Box') && articleSrc.includes('replyStatus ?'));
+  assert('ArticleView replyStatus 有内联和进度行双显示', articleSrc.includes('replyStatus') && articleSrc.includes('replying ?'));
   assert('ArticleView 评论光标与视口分离（cmtCursor + cmtViewport）', articleSrc.includes('cmtCursor') && articleSrc.includes('cmtViewport'));
   assert('ArticleView 不再使用 cmtScroll', !articleSrc.includes('cmtScroll'));
+
+  // ---- TEST 14: Bug 修复回归验证 ----
+  console.log('\n📋 [14] Bug 修复回归验证');
+  // Bug: r 回复变成发新评论 — n/r 键互斥状态修复
+  assert('n 键设置 newCommentMode 时同步重置 replyMode', articleSrc.includes('setReplyMode(false)') && articleSrc.includes('setNewCommentMode(true)'));
+  assert('r 键设置 replyMode 时同步重置 newCommentMode', articleSrc.includes('setNewCommentMode(false)') && articleSrc.includes('setReplyMode(true)'));
+  // Bug: reply-btn/up-btn 超时 — state:attached + scrollIntoView
+  assert('replyComment waitForSelector 用 state attached', apiSrc.includes("'.reply-btn'") && apiSrc.includes("state: 'attached'"));
+  assert('likeComment waitForSelector 用 state attached', apiSrc.includes("'.up-btn'") && apiSrc.includes("state: 'attached'"));
+  assert('replyComment 点击前 scrollIntoViewIfNeeded', apiSrc.includes('scrollIntoViewIfNeeded'));
+  // Bug: 回复实际发成新评论 — textarea 用 .last() 而非 .first()
+  assert('replyComment textarea 用 last 而非 first', apiSrc.includes("js-cnt-box').last()"));
+  assert('replyComment submitBtn 用 last 而非 first', apiSrc.includes("js-submit-btn').last()"));
+  // Bug: 发表成功后空行抖动 — replying 期间保持进度行
+  assert('提交期间进度行保持显示（replying 条件渲染）', articleSrc.includes('replying ?') || articleSrc.includes('replying?'));
+  assert('setReplying(false) 推迟到 replyStatus 清除时', articleSrc.includes('setReplying(false)') && articleSrc.includes("setReplyStatus('')") && !articleSrc.includes('setReplying(false);\n    setReplyStatus(result'));
+  // postComment 功能存在性
+  assert('api 有 postComment 函数', apiSrc.includes('postComment'));
+  assert('ArticleView n 键触发发新评论', articleSrc.includes("'n'") && articleSrc.includes('newCommentMode'));
+  assert('postComment 使用跟贴独立页 comment.tie.163.com', apiSrc.includes('comment.tie.163.com'));
 
   // ---- 汇总 ----
   console.log('\n' + '='.repeat(50));

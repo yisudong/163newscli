@@ -5,7 +5,7 @@ import { exec } from 'child_process';
 import type { ArticleDetail, CommentThread } from '../types.js';
 import type { AuthState } from '../auth/index.js';
 import { htmlToText, wrapText, formatTime, truncate, padEndWidth } from '../utils/text.js';
-import { fetchComments, replyComment, likeComment } from '../api/index.js';
+import { fetchComments, replyComment, likeComment, postComment } from '../api/index.js';
 
 interface ArticleViewProps {
   article: ArticleDetail | null;
@@ -23,6 +23,7 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
   const [cmtCursor, setCmtCursor] = useState(0);
   const [cmtViewport, setCmtViewport] = useState(0);
   const [replyMode, setReplyMode] = useState(false);
+  const [newCommentMode, setNewCommentMode] = useState(false);
   const [replyInput, setReplyInput] = useState('');
   const [replyStatus, setReplyStatus] = useState('');
   const [replying, setReplying] = useState(false);
@@ -46,8 +47,10 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
   const cmtViewportRef = useRef(cmtViewport);
 
   const replyModeRef = useRef(replyMode);
+  const newCommentModeRef = useRef(newCommentMode);
   const replyingRef = useRef(replying);
   useEffect(() => { replyModeRef.current = replyMode; }, [replyMode]);
+  useEffect(() => { newCommentModeRef.current = newCommentMode; }, [newCommentMode]);
   useEffect(() => { replyingRef.current = replying; }, [replying]);
   useEffect(() => { loadingRef.current = loading; }, [loading]);
   useEffect(() => { articleRef.current = article; }, [article]);
@@ -86,18 +89,27 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
 
   useInput((input, key) => {
     if (replyingRef.current) return;
-    if (replyModeRef.current) {
-      if (key.escape) { setReplyMode(false); setReplyInput(''); setReplyStatus(''); }
+    if (replyModeRef.current || newCommentModeRef.current) {
+      if (key.escape) { setReplyMode(false); setNewCommentMode(false); setReplyInput(''); setReplyStatus(''); }
       return;
     }
   });
 
   useInput((input, key) => {
     if (loadingRef.current) return;
-    if (replyModeRef.current || replyingRef.current) return;
+    if (replyModeRef.current || newCommentModeRef.current || replyingRef.current) return;
 
     if (input === 'q' || key.escape) {
       onBack();
+      return;
+    }
+
+    if (input === 'n') {
+      if (!auth) { setReplyStatus('请先登录后再评论'); setTimeout(() => setReplyStatus(''), 2000); return; }
+      setReplyInput('');
+      setReplyStatus('');
+      setReplyMode(false);
+      setNewCommentMode(true);
       return;
     }
 
@@ -147,6 +159,7 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
         if (!auth) { setReplyStatus('请先登录后再回复'); setTimeout(() => setReplyStatus(''), 2000); return; }
         setReplyInput('');
         setReplyStatus('');
+        setNewCommentMode(false);
         setReplyMode(true);
       }
       else if (input === 'v') {
@@ -233,23 +246,25 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
   };
 
   const statusBar = tab === 'article'
-    ? `↑↓/jk 滚动  d/u 半页  g/G 首尾  o 浏览器  c 评论  l 登录  q 返回`
-    : `↑↓/jk 滚动  d/u 半页  r 回复  v 点赞  f 刷新  c 正文  l 登录  q 返回`;
+    ? `↑↓/jk 滚动  d/u 半页  g/G 首尾  o 浏览器  n 评论  c 评论  l 登录  q 返回`
+    : `↑↓/jk 滚动  d/u 半页  n 评论  r 回复  v 点赞  f 刷新  c 正文  l 登录  q 返回`;
 
   const submitReply = async () => {
     const art = articleRef.current;
-    const scroll = cmtCursorRef.current;
     if (!art || replyInput.trim().length < 2) return;
+    const isNewComment = newCommentModeRef.current;
     setReplyMode(false);
+    setNewCommentMode(false);
     setReplying(true);
-    setReplyStatus('正在打开评论页...');
-    const result = await replyComment(art.docid, scroll, replyInput.trim(), setReplyStatus);
-    setReplying(false);
+    setReplyStatus(isNewComment ? '正在打开跟贴页...' : '正在打开评论页...');
+    const result = isNewComment
+      ? await postComment(art.docid, replyInput.trim(), setReplyStatus)
+      : await replyComment(art.docid, cmtCursorRef.current, replyInput.trim(), setReplyStatus);
     setReplyStatus(result.message);
     if (result.ok) {
-      setTimeout(() => { setReplyStatus(''); loadComments(); }, 1500);
+      setTimeout(() => { setReplying(false); setReplyStatus(''); loadComments(); }, 1500);
     } else {
-      setTimeout(() => setReplyStatus(''), 3000);
+      setTimeout(() => { setReplying(false); setReplyStatus(''); }, 3000);
     }
   };
 
@@ -293,17 +308,21 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
             </Box>
           )}
 
-          {replyMode && (
+          {(replyMode || newCommentMode) ? (
             <Box borderStyle="single" borderColor="cyan" paddingX={1}>
-              <Text color="cyan">回复 › </Text>
+              <Text color="cyan">{newCommentMode ? '评论 › ' : '回复 › '}</Text>
               <TextInput
                 value={replyInput}
                 onChange={setReplyInput}
                 onSubmit={submitReply}
-                placeholder="输入回复内容，Enter 提交，Esc 取消..."
+                placeholder={newCommentMode ? '输入评论内容，Enter 提交，Esc 取消...' : '输入回复内容，Enter 提交，Esc 取消...'}
               />
             </Box>
-          )}
+          ) : replying ? (
+            <Box borderStyle="single" borderColor={replyStatus.includes('成功') ? 'green' : 'cyan'} paddingX={1}>
+              <Text color={replyStatus.includes('成功') ? 'green' : 'cyan'}>{replyStatus || '处理中...'}</Text>
+            </Box>
+          ) : null}
         </>
       ) : (
         <Box paddingX={2} paddingY={1} flexGrow={1}>
@@ -319,7 +338,7 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
         {tab === 'comments' && threads.length > 0 && (
           <Text color="gray">  [{cmtCursor + 1}/{threads.length}条]</Text>
         )}
-        {replyStatus ? (
+        {replyStatus && !replying ? (
           <Text color={replyStatus.startsWith('👍') || replyStatus.includes('成功') ? 'green' : replyStatus.startsWith('请') ? 'yellow' : 'cyan'}>{'  '}{replyStatus}</Text>
         ) : (
           <Text color={auth ? 'green' : 'gray'}>{'  '}{auth ? `🔐 ${auth.nickname || '已登录'}` : '⬜ 未登录'}</Text>
