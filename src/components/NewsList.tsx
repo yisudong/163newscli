@@ -100,8 +100,8 @@ export function NewsList({ title, items, loading, onSelect, onBack, onRefresh }:
             const isSelected = realIndex === cursor;
             const timeStr = formatTime(item.ptime);
             const indexStr = String(realIndex + 1).padStart(3, ' ');
-            // 固定列：paddingX(2) + index+space(4) + source(10) + time(9) = 25
-            const titleWidth = Math.max(10, termWidth - 25);
+            // 固定列：paddingX(2) + index+space(4) + source(10) + space+time(12) = 28
+            const titleWidth = Math.max(10, termWidth - 28);
             const titleStr = truncate(item.title, titleWidth);
             const sourceStr = truncate(item.source, 8);
 

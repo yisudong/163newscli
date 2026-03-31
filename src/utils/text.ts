@@ -52,17 +52,11 @@ export function htmlToText(html: string): string {
  */
 export function formatTime(ptime: string): string {
   if (!ptime) return '';
-  // 网易时间里有时用逗号替代冒号
   const normalized = ptime.replace(/,/g, ':');
   const match = normalized.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
-  if (!match) return ptime.slice(0, 16);
-  const [, year, month, day, hour, min] = match;
-  const now = new Date();
-  const nowYear = now.getFullYear().toString();
-  if (year === nowYear) {
-    return `${month}-${day} ${hour}:${min}`;
-  }
-  return `${year}-${month}-${day}`;
+  if (!match) return ptime.slice(0, 11);
+  const [, , month, day, hour, min] = match;
+  return `${month}-${day} ${hour}:${min}`;
 }
 
 /**

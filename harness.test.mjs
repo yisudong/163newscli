@@ -52,6 +52,12 @@ function assert(name, cond, detail = '') {
   assert('htmlToText 图片占位', htmlToText('<!--IMG#0-->').includes('[图片]'));
   assert('formatTime 标准格式', formatTime('2026-03-31 12:37:00') === '03-31 12:37');
   assert('formatTime 逗号格式', formatTime('2026-03-31 12,37,00') === '03-31 12:37');
+  assert('formatTime 往年统一MM-DD格式', formatTime('2024-11-15 23:59:00') === '11-15 23:59');
+  assert('formatTime 输出宽度恒为11', [
+    '2026-03-31 14:30:00',
+    '2025-12-01 08:05:00',
+    '2024-01-01 00:00:00',
+  ].every(t => { let w = 0; for (const c of formatTime(t)) w += c.charCodeAt(0) > 127 ? 2 : 1; return w === 11; }));
   assert('truncate 中文截断', truncate('这是一段很长的标题文字内容', 10).endsWith('…'));
   assert('wrapText 不超过宽度', wrapText('hello world这是中文测试', 10).every(l => {
     let w = 0;
