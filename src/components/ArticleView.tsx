@@ -5,7 +5,7 @@ import { exec } from 'child_process';
 import type { ArticleDetail, CommentThread } from '../types.js';
 import type { AuthState } from '../auth/index.js';
 import { htmlToText, wrapText, formatTime, truncate, padEndWidth } from '../utils/text.js';
-import { fetchComments, replyComment } from '../api/index.js';
+import { fetchComments, replyComment, likeComment } from '../api/index.js';
 
 interface ArticleViewProps {
   article: ArticleDetail | null;
@@ -20,7 +20,8 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
   const [tab, setTab] = useState<'article' | 'comments'>('article');
   const [threads, setThreads] = useState<CommentThread[]>([]);
   const [cmtLoading, setCmtLoading] = useState(false);
-  const [cmtScroll, setCmtScroll] = useState(0);
+  const [cmtCursor, setCmtCursor] = useState(0);
+  const [cmtViewport, setCmtViewport] = useState(0);
   const [replyMode, setReplyMode] = useState(false);
   const [replyInput, setReplyInput] = useState('');
   const [replyStatus, setReplyStatus] = useState('');
@@ -41,7 +42,8 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
   const tabRef = useRef(tab);
   const threadsRef = useRef(threads);
   const cmtLoadingRef = useRef(cmtLoading);
-  const cmtScrollRef = useRef(cmtScroll);
+  const cmtCursorRef = useRef(cmtCursor);
+  const cmtViewportRef = useRef(cmtViewport);
 
   const replyModeRef = useRef(replyMode);
   const replyingRef = useRef(replying);
@@ -53,13 +55,15 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
   useEffect(() => { tabRef.current = tab; }, [tab]);
   useEffect(() => { threadsRef.current = threads; }, [threads]);
   useEffect(() => { cmtLoadingRef.current = cmtLoading; }, [cmtLoading]);
-  useEffect(() => { cmtScrollRef.current = cmtScroll; }, [cmtScroll]);
+  useEffect(() => { cmtCursorRef.current = cmtCursor; }, [cmtCursor]);
+  useEffect(() => { cmtViewportRef.current = cmtViewport; }, [cmtViewport]);
 
   useEffect(() => {
     setScrollTop(0);
     setTab('article');
     setThreads([]);
-    setCmtScroll(0);
+    setCmtCursor(0);
+    setCmtViewport(0);
     if (article) {
       const text = htmlToText(article.body);
       setLines(wrapText(text, contentWidth));
@@ -73,7 +77,8 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
     if (!art || cmtLoadingRef.current) return;
     setCmtLoading(true);
     setThreads([]);
-    setCmtScroll(0);
+    setCmtCursor(0);
+    setCmtViewport(0);
     const list = await fetchComments(art.docid);
     setThreads(list);
     setCmtLoading(false);
@@ -118,19 +123,44 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
       else if (input === 'o') { const link = articleRef.current?.shareLink; if (link) exec(`open "${link}"`); }
     } else {
       const ts = threadsRef.current;
-      const maxScroll = Math.max(0, ts.length - 1);
-      if (key.upArrow || input === 'k') setCmtScroll(s => Math.max(0, s - 1));
-      else if (key.downArrow || input === 'j') setCmtScroll(s => Math.min(maxScroll, s + 1));
-      else if (key.pageDown || input === 'd') setCmtScroll(s => Math.min(maxScroll, s + 5));
-      else if (key.pageUp || input === 'u') setCmtScroll(s => Math.max(0, s - 5));
-      else if (input === 'g') setCmtScroll(0);
-      else if (input === 'G') setCmtScroll(maxScroll);
-      else if (input === 'R') loadComments();
+      const maxCursor = Math.max(0, ts.length - 1);
+      const ch = contentHeightRef.current;
+
+      const moveCursor = (next: number) => {
+        const clamped = Math.max(0, Math.min(maxCursor, next));
+        setCmtCursor(clamped);
+        setCmtViewport(vp => {
+          if (clamped < vp) return clamped;
+          if (clamped >= vp + ch) return clamped - ch + 1;
+          return vp;
+        });
+      };
+
+      if (key.upArrow || input === 'k') moveCursor(cmtCursorRef.current - 1);
+      else if (key.downArrow || input === 'j') moveCursor(cmtCursorRef.current + 1);
+      else if (key.pageDown || input === 'd') moveCursor(cmtCursorRef.current + 5);
+      else if (key.pageUp || input === 'u') moveCursor(cmtCursorRef.current - 5);
+      else if (input === 'g') moveCursor(0);
+      else if (input === 'G') moveCursor(maxCursor);
+      else if (input === 'f') loadComments();
       else if (input === 'r') {
         if (!auth) { setReplyStatus('请先登录后再回复'); setTimeout(() => setReplyStatus(''), 2000); return; }
         setReplyInput('');
         setReplyStatus('');
         setReplyMode(true);
+      }
+      else if (input === 'v') {
+        if (!auth) { setReplyStatus('请先登录后再点赞'); setTimeout(() => setReplyStatus(''), 2000); return; }
+        const art = articleRef.current;
+        if (!art) return;
+        const cursor = cmtCursorRef.current;
+        setReplying(true);
+        setReplyStatus('正在打开评论页...');
+        likeComment(art.docid, cursor, setReplyStatus).then(result => {
+          setReplying(false);
+          setReplyStatus(result.message);
+          setTimeout(() => setReplyStatus(''), 2500);
+        });
       }
     }
   });
@@ -146,10 +176,12 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
 
   const renderThreads = () => {
     const rows: React.ReactNode[] = [];
-    const visible = threads.slice(cmtScroll, cmtScroll + contentHeight);
+    const visible = threads.slice(cmtViewport, cmtViewport + contentHeight);
+    const selectedInView = cmtCursor - cmtViewport;
 
     for (let ti = 0; ti < visible.length; ti++) {
       const thread = visible[ti];
+      const isSelected = ti === selectedInView;
       const isMulti = thread.comments.length > 1;
 
       for (let ci = 0; ci < thread.comments.length; ci++) {
@@ -163,12 +195,12 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
           const mainContentW = Math.max(10, contentWidth - nameWidth - voteWidth - timeWidth - 3);
           rows.push(
             <Box key={`${ti}-${ci}`} paddingX={1}>
-              <Text color="cyan">{padEndWidth(truncate(c.nickName, nameWidth), nameWidth)}</Text>
-              <Text> </Text>
-              <Text bold={false}>{padEndWidth(truncate(c.content, mainContentW), mainContentW)}</Text>
-              <Text> </Text>
-              <Text color="yellow">{padEndWidth(c.vote > 0 ? `👍${c.vote}` : '', voteWidth)}</Text>
-              <Text color="gray"> {c.createTime.slice(5, 16)}</Text>
+              <Text color="cyan" inverse={isSelected} bold={isSelected}>{padEndWidth(truncate(c.nickName, nameWidth), nameWidth)}</Text>
+              <Text inverse={isSelected}> </Text>
+              <Text inverse={isSelected} bold={false}>{padEndWidth(truncate(c.content, mainContentW), mainContentW)}</Text>
+              <Text inverse={isSelected}> </Text>
+              <Text color={isSelected ? undefined : 'yellow'} inverse={isSelected}>{padEndWidth(c.vote > 0 ? `👍${c.vote}` : '', voteWidth)}</Text>
+              <Text color={isSelected ? undefined : 'gray'} inverse={isSelected}> {c.createTime.slice(5, 16)}</Text>
             </Box>
           );
         } else {
@@ -179,10 +211,10 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
           const replyContentW = Math.max(10, contentWidth - prefixW - nameWidth - 3);
           rows.push(
             <Box key={`${ti}-${ci}`} paddingX={1}>
-              <Text color="gray">{prefixFull}</Text>
-              <Text color="cyan">{padEndWidth(truncate(c.nickName, nameWidth), nameWidth)}</Text>
-              <Text> </Text>
-              <Text color="white">{truncate(c.content, replyContentW)}</Text>
+              <Text color={isSelected ? undefined : 'gray'} inverse={isSelected}>{prefixFull}</Text>
+              <Text color="cyan" inverse={isSelected}>{padEndWidth(truncate(c.nickName, nameWidth), nameWidth)}</Text>
+              <Text inverse={isSelected}> </Text>
+              <Text color={isSelected ? undefined : 'white'} inverse={isSelected}>{truncate(c.content, replyContentW)}</Text>
             </Box>
           );
         }
@@ -202,11 +234,11 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
 
   const statusBar = tab === 'article'
     ? `↑↓/jk 滚动  d/u 半页  g/G 首尾  o 浏览器  c 评论  l 登录  q 返回`
-    : `↑↓/jk 滚动  d/u 半页  r 回复  R 刷新  c 正文  l 登录  q 返回`;
+    : `↑↓/jk 滚动  d/u 半页  r 回复  v 点赞  f 刷新  c 正文  l 登录  q 返回`;
 
   const submitReply = async () => {
     const art = articleRef.current;
-    const scroll = cmtScrollRef.current;
+    const scroll = cmtCursorRef.current;
     if (!art || replyInput.trim().length < 2) return;
     setReplyMode(false);
     setReplying(true);
@@ -255,7 +287,7 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
                 </Box>
               ) : threads.length === 0 ? (
                 <Box paddingX={2} paddingY={1}>
-                  <Text color="gray">暂无评论，按 R 刷新</Text>
+                  <Text color="gray">暂无评论，按 f 刷新</Text>
                 </Box>
               ) : renderThreads()}
             </Box>
@@ -285,9 +317,13 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
           <Text color="gray">  [{scrollTop + 1}/{lines.length}行 {progress}%]</Text>
         )}
         {tab === 'comments' && threads.length > 0 && (
-          <Text color="gray">  [{cmtScroll + 1}/{threads.length}条]</Text>
+          <Text color="gray">  [{cmtCursor + 1}/{threads.length}条]</Text>
         )}
-        <Text color={auth ? 'green' : 'gray'}>{'  '}{auth ? `🔐 ${auth.nickname || '已登录'}` : '⬜ 未登录'}</Text>
+        {replyStatus ? (
+          <Text color={replyStatus.startsWith('👍') || replyStatus.includes('成功') ? 'green' : replyStatus.startsWith('请') ? 'yellow' : 'cyan'}>{'  '}{replyStatus}</Text>
+        ) : (
+          <Text color={auth ? 'green' : 'gray'}>{'  '}{auth ? `🔐 ${auth.nickname || '已登录'}` : '⬜ 未登录'}</Text>
+        )}
       </Box>
     </Box>
   );

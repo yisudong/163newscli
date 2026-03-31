@@ -4,7 +4,8 @@
   "description": "网易新闻命令行工具 - 热搜、热点、频道浏览、文章阅读",
   "type": "module",
   "bin": {
-    "163news": "./dist/cli.js"
+    "163news": "./dist/cli.js",
+    "163newscli": "./dist/cli.js"
   },
   "scripts": {
     "dev": "node --loader ts-node/esm src/cli.tsx",

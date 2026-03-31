@@ -182,15 +182,39 @@ function assert(name, cond, detail = '') {
   console.log('\n📋 [12] 回复评论功能验证');
   assert('api 有 replyComment 函数', apiSrc.includes('replyComment'));
   assert('replyComment 使用 Playwright headless', apiSrc.includes('headless: true'));
+  assert('replyComment 使用新入口 dy/article', apiSrc.includes('dy/article'));
   assert('replyComment 点击 .reply-btn', apiSrc.includes('reply-btn'));
-  assert('replyComment 点击 .submit', apiSrc.includes('.submit'));
+  assert('replyComment 填写 textarea.js-cnt-box', apiSrc.includes('js-cnt-box'));
+  assert('replyComment 点击 .js-submit-btn', apiSrc.includes('js-submit-btn'));
   assert('replyComment 有字数校验（2~1000）', apiSrc.includes('content.length < 2'));
   assert('replyComment 有登录检查', apiSrc.includes('未登录'));
   assert('ArticleView 引入 replyComment', articleSrc.includes('replyComment'));
   assert('ArticleView r 键触发回复', articleSrc.includes("'r'") && articleSrc.includes('replyMode'));
   assert('ArticleView 有 TextInput 回复输入框', articleSrc.includes('TextInput'));
-  assert('ArticleView R 键刷新评论', articleSrc.includes("'R'") && articleSrc.includes('loadComments'));
+  assert('ArticleView f 键刷新评论（非 R）', articleSrc.includes("'f'") && articleSrc.includes('loadComments') && !articleSrc.includes("'R'"));
   assert('replyComment 有 finally browser.close', apiSrc.includes('finally'));
+  assert('replyComment 外层 try/catch 防崩溃', apiSrc.includes('catch (err'));
+
+  // ---- TEST 13: 评论高亮 + 点赞功能验证 ----
+  console.log('\n📋 [13] 评论高亮 + 点赞功能验证');
+  assert('api 有 likeComment 函数', apiSrc.includes('likeComment'));
+  assert('likeComment 使用 Playwright headless', apiSrc.includes('headless: true'));
+  assert('likeComment 使用新入口 dy/article', apiSrc.includes('dy/article'));
+  assert('likeComment 点击 .up-btn', apiSrc.includes('.up-btn'));
+  assert('likeComment 不再使用 .support（旧选择器）', !apiSrc.includes("'.support'") && !apiSrc.includes('".support"'));
+  assert('likeComment 有登录检查', apiSrc.includes('未登录，请先登录'));
+  assert('likeComment 监听 upvote 响应', apiSrc.includes('upvote'));
+  assert('likeComment 外层 try/catch 防崩溃', apiSrc.includes('catch (err'));
+  assert('ArticleView 引入 likeComment', articleSrc.includes('likeComment'));
+  assert('ArticleView v 键触发点赞', articleSrc.includes("'v'") && articleSrc.includes('likeComment'));
+  assert('ArticleView 有评论高亮（inverse）', articleSrc.includes('inverse') && articleSrc.includes('isSelected'));
+  assert('ArticleView 状态栏包含 v 点赞提示', articleSrc.includes('v 点赞'));
+  assert('ArticleView 状态栏包含 f 刷新提示', articleSrc.includes('f 刷新'));
+  assert('ArticleView 暂无评论提示用 f 刷新', articleSrc.includes('\\u6309 f \\u5237\\u65B0') || articleSrc.includes('按 f 刷新'));
+  assert('ArticleView 有 replyStatus 显示区域', articleSrc.includes('replyStatus') && articleSrc.includes('成功'));
+  assert('ArticleView replyStatus 内联在状态栏（不单独占行）', !articleSrc.includes('replyStatus ? (React.createElement(Box') && articleSrc.includes('replyStatus ?'));
+  assert('ArticleView 评论光标与视口分离（cmtCursor + cmtViewport）', articleSrc.includes('cmtCursor') && articleSrc.includes('cmtViewport'));
+  assert('ArticleView 不再使用 cmtScroll', !articleSrc.includes('cmtScroll'));
 
   // ---- 汇总 ----
   console.log('\n' + '='.repeat(50));

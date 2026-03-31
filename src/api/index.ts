@@ -190,81 +190,136 @@ export async function fetchComments(docid: string, limit = 20): Promise<CommentT
   }
 }
 
+async function openCommentPage(docid: string) {
+  const { chromium } = await import('playwright');
+  const { loadAuth } = await import('../auth/index.js');
+  const auth = loadAuth();
+  if (!auth?.cookies?.length) return null;
+
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await context.addCookies(auth.cookies.map(c => ({
+    name: c.name, value: c.value,
+    domain: c.domain.startsWith('.') ? c.domain : '.' + c.domain,
+    path: c.path || '/', expires: c.expires ?? -1,
+    httpOnly: c.httpOnly ?? false, secure: c.secure ?? false,
+    sameSite: 'Lax' as const,
+  })));
+  const page = await context.newPage();
+  // comment.tie.163.com 已 302 下线，改用 dy/article 路由（会自动 redirect 到 /news/article/）
+  await page.goto(`https://www.163.com/dy/article/${docid}.html`, {
+    waitUntil: 'networkidle', timeout: 25000,
+  });
+  // 滚动触发评论懒加载（评论区在页面底部）
+  for (let i = 0; i < 3; i++) {
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(1200);
+  }
+  return { browser, page };
+}
+
 export async function replyComment(
   docid: string,
   replyToIndex: number,
   content: string,
   onStatus: (msg: string) => void
 ): Promise<{ ok: boolean; message: string }> {
-  const { chromium } = await import('playwright');
-  const { loadAuth } = await import('../auth/index.js');
-
-  const auth = loadAuth();
-  if (!auth?.cookies?.length) {
-    return { ok: false, message: '未登录，请先登录' };
-  }
-  if (content.length < 2 || content.length > 1000) {
-    return { ok: false, message: '回复内容需在 2~1000 字之间' };
-  }
-
-  onStatus('正在打开评论页...');
-  const browser = await chromium.launch({ headless: true });
   try {
-    const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
-    await context.addCookies(auth.cookies.map(c => ({
-      name: c.name, value: c.value,
-      domain: c.domain.startsWith('.') ? c.domain : '.' + c.domain,
-      path: c.path || '/', expires: c.expires ?? -1,
-      httpOnly: c.httpOnly ?? false, secure: c.secure ?? false,
-      sameSite: 'Lax' as const,
-    })));
+    const { loadAuth } = await import('../auth/index.js');
+    if (!loadAuth()?.cookies?.length) return { ok: false, message: '未登录，请先登录' };
+    if (content.length < 2 || content.length > 1000) return { ok: false, message: '回复内容需在 2~1000 字之间' };
 
-    const page = await context.newPage();
-    await page.goto(`https://comment.tie.163.com/${docid}.html`, {
-      waitUntil: 'networkidle', timeout: 20000,
-    });
+    onStatus('正在打开评论页...');
+    const session = await openCommentPage(docid);
+    if (!session) return { ok: false, message: '未登录，请先登录' };
+    const { browser, page } = session;
+    try {
+      onStatus('加载评论中...');
+      await page.waitForSelector('.reply-btn', { timeout: 10000 });
 
-    onStatus('加载评论中...');
-    await page.waitForSelector('.reply-btn', { timeout: 10000 });
+      const replyBtns = page.locator('.reply-btn');
+      const count = await replyBtns.count();
+      await replyBtns.nth(Math.min(replyToIndex, count - 1)).click();
+      await page.waitForTimeout(400);
 
-    const replyBtns = page.locator('.reply-btn');
-    const count = await replyBtns.count();
-    const targetIdx = Math.min(replyToIndex, count - 1);
+      await page.locator('textarea.js-cnt-box').first().fill(content);
+      await page.waitForTimeout(200);
 
-    await replyBtns.nth(targetIdx).click();
-    await page.waitForTimeout(400);
+      onStatus('正在提交回复...');
+      let result: { ok: boolean; message: string } | null = null;
 
-    const textarea = page.locator('textarea').first();
-    await textarea.fill(content);
-    await page.waitForTimeout(200);
-
-    onStatus('正在提交回复...');
-    let result: { ok: boolean; message: string } | null = null;
-
-    const responseHandler = async (res: import('playwright').Response) => {
-      if (res.url().includes('/comments') && res.request().method() === 'POST') {
-        const body = await res.text().catch(() => '{}');
-        try {
-          const json = JSON.parse(body);
-          if (json.content || json.commentId || res.status() === 200) {
-            result = { ok: true, message: '回复成功！' };
-          } else {
-            result = { ok: false, message: json.message || `失败（${res.status()}）` };
+      page.on('response', async res => {
+        if (res.url().includes('/comments') && res.request().method() === 'POST') {
+          const body = await res.text().catch(() => '{}');
+          try {
+            const json = JSON.parse(body);
+            result = (json.content || json.commentId || res.status() === 200 || res.status() === 201)
+              ? { ok: true, message: '回复成功！' }
+              : { ok: false, message: json.message || `失败（${res.status()}）` };
+          } catch {
+            result = res.status() < 300
+              ? { ok: true, message: '回复成功！' }
+              : { ok: false, message: `请求失败（${res.status()}）` };
           }
-        } catch {
-          result = res.status() < 300
-            ? { ok: true, message: '回复成功！' }
-            : { ok: false, message: `请求失败（${res.status()}）` };
         }
-      }
-    };
-    page.on('response', responseHandler);
+      });
 
-    await page.locator('.submit').first().click();
-    await page.waitForTimeout(3000);
+      await page.locator('.js-submit-btn').first().click();
+      await page.waitForTimeout(3000);
+      return result ?? { ok: false, message: '提交超时，请重试' };
+    } finally {
+      await browser.close().catch(() => {});
+    }
+  } catch (err: any) {
+    return { ok: false, message: err?.message ?? '操作失败' };
+  }
+}
 
-    return result ?? { ok: false, message: '提交超时，请重试' };
-  } finally {
-    await browser.close().catch(() => {});
+export async function likeComment(
+  docid: string,
+  likeIndex: number,
+  onStatus: (msg: string) => void
+): Promise<{ ok: boolean; message: string }> {
+  try {
+    const { loadAuth } = await import('../auth/index.js');
+    if (!loadAuth()?.cookies?.length) return { ok: false, message: '未登录，请先登录' };
+
+    onStatus('正在打开评论页...');
+    const session = await openCommentPage(docid);
+    if (!session) return { ok: false, message: '未登录，请先登录' };
+    const { browser, page } = session;
+    try {
+      onStatus('加载评论中...');
+      await page.waitForSelector('.up-btn', { timeout: 10000 });
+
+      const upBtns = page.locator('.up-btn');
+      const count = await upBtns.count();
+      onStatus('正在点赞...');
+
+      let result: { ok: boolean; message: string } | null = null;
+      page.on('response', async res => {
+        if (res.url().includes('upvote') || res.url().includes('/up')) {
+          const body = await res.text().catch(() => '{}');
+          try {
+            const json = JSON.parse(body);
+            result = (res.status() === 200 && !json.message)
+              ? { ok: true, message: '👍 点赞成功！' }
+              : { ok: false, message: json.message || `失败（${res.status()}）` };
+          } catch {
+            result = res.status() === 200
+              ? { ok: true, message: '👍 点赞成功！' }
+              : { ok: false, message: `请求失败（${res.status()}）` };
+          }
+        }
+      });
+
+      await upBtns.nth(Math.min(likeIndex, count - 1)).click();
+      await page.waitForTimeout(2000);
+      return result ?? { ok: false, message: '点赞超时，请重试' };
+    } finally {
+      await browser.close().catch(() => {});
+    }
+  } catch (err: any) {
+    return { ok: false, message: err?.message ?? '操作失败' };
   }
 }
