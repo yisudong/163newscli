@@ -1,4 +1,13 @@
 // 类型定义
+export interface Comment {
+  commentId: string | number;
+  content: string;
+  nickName: string;
+  vote: number;
+  createTime: string;
+  ip?: string;
+}
+
 export interface NewsItem {
   docid: string;
   title: string;
@@ -15,11 +24,13 @@ export interface ArticleDetail {
   title: string;
   source: string;
   ptime: string;
-  body: string;           // HTML 正文
+  body: string;
   digest?: string;
   shareLink?: string;
   ipLocation?: string;
   wordsCount?: number;
+  replyCount?: number;
+  replyBoard?: string;
 }
 
 export type ChannelKey = 'hot' | 'news' | 'ent' | 'sports' | 'money' | 'auto' | 'game' | 'edu' | 'jiankang' | 'fashion';

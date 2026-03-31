@@ -117,6 +117,22 @@ function assert(name, cond, detail = '') {
   });
   assert('非热搜各频道 label 显示宽度一致', new Set(labelWidths).size === 1, `宽度: ${labelWidths}`);
 
+  // ---- TEST 9: 评论接口 ----
+  console.log('\n📋 [9] 评论接口');
+  const { fetchComments } = await import('./dist/api/index.js');
+  const cmts = await fetchComments(hot[0].docid);
+  assert('fetchComments 返回数组', Array.isArray(cmts));
+  if (cmts.length > 0) {
+    assert('评论有 commentId', cmts[0]?.commentId != null);
+    assert('评论有 content', (cmts[0]?.content?.length ?? 0) > 0);
+    assert('评论有 nickName', (cmts[0]?.nickName?.length ?? 0) > 0);
+    assert('评论有 createTime', (cmts[0]?.createTime?.length ?? 0) > 0);
+  }
+  assert('ArticleView 有评论状态 tab', articleSrc.includes('tab'));
+  assert('ArticleView 有 fetchComments 引用', articleSrc.includes('fetchComments'));
+  assert('ArticleView c 键切换评论', articleSrc.includes("'c'") || articleSrc.includes('"c"'));
+  assert('ArticleDetail 含 replyCount 字段', articleSrc.includes('replyCount'));
+
   // ---- 汇总 ----
   console.log('\n' + '='.repeat(50));
   console.log(`结果: ${PASS} 通过 ${passed}  ${FAIL} 失败 ${failed}  总计 ${passed + failed}`);

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { NewsItem, ArticleDetail, Channel, ChannelKey } from '../types.js';
+import type { NewsItem, ArticleDetail, Comment, Channel, ChannelKey } from '../types.js';
 
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1';
 
@@ -136,8 +136,35 @@ export async function fetchArticle(docid: string): Promise<ArticleDetail | null>
       shareLink: article.shareLink || `https://c.m.163.com/news/a/${docid}.html`,
       ipLocation: article.ipLocation || '',
       wordsCount: article.wordsCount || 0,
+      replyCount: article.replyCount || 0,
+      replyBoard: article.replyBoard || '',
     };
   } catch {
     return null;
+  }
+}
+
+const COMMENT_PRODUCT_ID = 'a2869674571f77b5a0867c3d71db5856';
+
+export async function fetchComments(docid: string, limit = 20): Promise<Comment[]> {
+  try {
+    const { data } = await http.get<Record<string, any>>(
+      `https://comment.api.163.com/api/v1/products/${COMMENT_PRODUCT_ID}/threads/${docid}/comments/newList?limit=${limit}`
+    );
+    const ids: string[] = data.commentIds ?? [];
+    const map: Record<string, any> = data.comments ?? {};
+    return ids
+      .map(id => map[id])
+      .filter(Boolean)
+      .map(c => ({
+        commentId: c.commentId,
+        content: (c.content || '').trim(),
+        nickName: c.user?.nickName || c.user?.name || '匿名',
+        vote: c.vote ?? 0,
+        createTime: c.createTime || '',
+        ip: c.ip || '',
+      }));
+  } catch {
+    return [];
   }
 }
