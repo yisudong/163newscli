@@ -74,9 +74,9 @@ export function ArticleView({ article, loading, onBack }: ArticleViewProps) {
     : 100;
 
   return (
-    <Box flexDirection="column" width={termWidth}>
+    <Box flexDirection="column" width={termWidth} height={termHeight}>
       {loading ? (
-        <Box paddingX={2} paddingY={1}>
+        <Box paddingX={2} paddingY={1} flexGrow={1}>
           <Text color="yellow">⏳ 加载中...</Text>
         </Box>
       ) : article ? (
@@ -92,15 +92,14 @@ export function ArticleView({ article, loading, onBack }: ArticleViewProps) {
             </Box>
           </Box>
 
-          {/* 正文区 */}
-          <Box flexDirection="column" paddingX={2}>
+          <Box flexDirection="column" paddingX={2} height={contentHeight} overflow="hidden">
             {visibleLines.map((line, i) => (
               <Text key={i}>{line || ' '}</Text>
             ))}
           </Box>
         </>
       ) : (
-        <Box paddingX={2} paddingY={1}>
+        <Box paddingX={2} paddingY={1} flexGrow={1}>
           <Text color="red">❌ 文章加载失败，按 q 返回</Text>
         </Box>
       )}

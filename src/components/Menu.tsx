@@ -11,6 +11,7 @@ export function Menu({ onSelect }: MenuProps) {
   const [cursor, setCursor] = useState(0);
   const { stdout } = useStdout();
   const termWidth = stdout.columns || 80;
+  const termHeight = stdout.rows || 30;
 
   const menuItems = CHANNELS;
 
@@ -40,7 +41,7 @@ export function Menu({ onSelect }: MenuProps) {
   ].join('\n');
 
   return (
-    <Box flexDirection="column" width={termWidth} alignItems="center">
+    <Box flexDirection="column" width={termWidth} height={termHeight} alignItems="center" justifyContent="center">
       {/* Banner */}
       <Box marginTop={1} marginBottom={1} flexDirection="column" alignItems="center">
         {banner.split('\n').map((line, i) => (

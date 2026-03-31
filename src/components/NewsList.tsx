@@ -75,7 +75,7 @@ export function NewsList({ title, items, loading, onSelect, onBack, onRefresh }:
   const visibleItems = items.slice(offset, offset + visibleCount);
 
   return (
-    <Box flexDirection="column" width={termWidth}>
+    <Box flexDirection="column" width={termWidth} height={termHeight}>
       {/* 标题栏 */}
       <Box borderStyle="round" borderColor="cyan" paddingX={1}>
         <Text bold color="cyan">{title}</Text>
