@@ -190,4 +190,81 @@ export async function fetchComments(docid: string, limit = 20): Promise<CommentT
   }
 }
 
+export async function replyComment(
+  docid: string,
+  replyToIndex: number,
+  content: string,
+  onStatus: (msg: string) => void
+): Promise<{ ok: boolean; message: string }> {
+  const { chromium } = await import('playwright');
+  const { loadAuth } = await import('../auth/index.js');
 
+  const auth = loadAuth();
+  if (!auth?.cookies?.length) {
+    return { ok: false, message: '未登录，请先登录' };
+  }
+  if (content.length < 2 || content.length > 1000) {
+    return { ok: false, message: '回复内容需在 2~1000 字之间' };
+  }
+
+  onStatus('正在打开评论页...');
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+    await context.addCookies(auth.cookies.map(c => ({
+      name: c.name, value: c.value,
+      domain: c.domain.startsWith('.') ? c.domain : '.' + c.domain,
+      path: c.path || '/', expires: c.expires ?? -1,
+      httpOnly: c.httpOnly ?? false, secure: c.secure ?? false,
+      sameSite: 'Lax' as const,
+    })));
+
+    const page = await context.newPage();
+    await page.goto(`https://comment.tie.163.com/${docid}.html`, {
+      waitUntil: 'networkidle', timeout: 20000,
+    });
+
+    onStatus('加载评论中...');
+    await page.waitForSelector('.reply-btn', { timeout: 10000 });
+
+    const replyBtns = page.locator('.reply-btn');
+    const count = await replyBtns.count();
+    const targetIdx = Math.min(replyToIndex, count - 1);
+
+    await replyBtns.nth(targetIdx).click();
+    await page.waitForTimeout(400);
+
+    const textarea = page.locator('textarea').first();
+    await textarea.fill(content);
+    await page.waitForTimeout(200);
+
+    onStatus('正在提交回复...');
+    let result: { ok: boolean; message: string } | null = null;
+
+    const responseHandler = async (res: import('playwright').Response) => {
+      if (res.url().includes('/comments') && res.request().method() === 'POST') {
+        const body = await res.text().catch(() => '{}');
+        try {
+          const json = JSON.parse(body);
+          if (json.content || json.commentId || res.status() === 200) {
+            result = { ok: true, message: '回复成功！' };
+          } else {
+            result = { ok: false, message: json.message || `失败（${res.status()}）` };
+          }
+        } catch {
+          result = res.status() < 300
+            ? { ok: true, message: '回复成功！' }
+            : { ok: false, message: `请求失败（${res.status()}）` };
+        }
+      }
+    };
+    page.on('response', responseHandler);
+
+    await page.locator('.submit').first().click();
+    await page.waitForTimeout(3000);
+
+    return result ?? { ok: false, message: '提交超时，请重试' };
+  } finally {
+    await browser.close().catch(() => {});
+  }
+}

@@ -178,6 +178,20 @@ function assert(name, cond, detail = '') {
   assert('loginWithBrowser 有超时保护（180000）', authSrc.includes('180000'));
   assert('loginWithBrowser 外层有 try/catch 包裹 chromium.launch', authSrc.includes('chromium.launch'));
 
+  // ---- TEST 12: 回复评论功能验证 ----
+  console.log('\n📋 [12] 回复评论功能验证');
+  assert('api 有 replyComment 函数', apiSrc.includes('replyComment'));
+  assert('replyComment 使用 Playwright headless', apiSrc.includes('headless: true'));
+  assert('replyComment 点击 .reply-btn', apiSrc.includes('reply-btn'));
+  assert('replyComment 点击 .submit', apiSrc.includes('.submit'));
+  assert('replyComment 有字数校验（2~1000）', apiSrc.includes('content.length < 2'));
+  assert('replyComment 有登录检查', apiSrc.includes('未登录'));
+  assert('ArticleView 引入 replyComment', articleSrc.includes('replyComment'));
+  assert('ArticleView r 键触发回复', articleSrc.includes("'r'") && articleSrc.includes('replyMode'));
+  assert('ArticleView 有 TextInput 回复输入框', articleSrc.includes('TextInput'));
+  assert('ArticleView R 键刷新评论', articleSrc.includes("'R'") && articleSrc.includes('loadComments'));
+  assert('replyComment 有 finally browser.close', apiSrc.includes('finally'));
+
   // ---- 汇总 ----
   console.log('\n' + '='.repeat(50));
   console.log(`结果: ${PASS} 通过 ${passed}  ${FAIL} 失败 ${failed}  总计 ${passed + failed}`);

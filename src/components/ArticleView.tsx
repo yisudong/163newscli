@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text, useInput, useStdout } from 'ink';
+import TextInput from 'ink-text-input';
 import { exec } from 'child_process';
 import type { ArticleDetail, CommentThread } from '../types.js';
 import type { AuthState } from '../auth/index.js';
 import { htmlToText, wrapText, formatTime, truncate, padEndWidth } from '../utils/text.js';
-import { fetchComments } from '../api/index.js';
+import { fetchComments, replyComment } from '../api/index.js';
 
 interface ArticleViewProps {
   article: ArticleDetail | null;
@@ -20,6 +21,10 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
   const [threads, setThreads] = useState<CommentThread[]>([]);
   const [cmtLoading, setCmtLoading] = useState(false);
   const [cmtScroll, setCmtScroll] = useState(0);
+  const [replyMode, setReplyMode] = useState(false);
+  const [replyInput, setReplyInput] = useState('');
+  const [replyStatus, setReplyStatus] = useState('');
+  const [replying, setReplying] = useState(false);
 
   const { stdout } = useStdout();
   const termWidth = stdout.columns || 80;
@@ -38,7 +43,10 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
   const cmtLoadingRef = useRef(cmtLoading);
   const cmtScrollRef = useRef(cmtScroll);
 
-  useEffect(() => { linesRef.current = lines; }, [lines]);
+  const replyModeRef = useRef(replyMode);
+  const replyingRef = useRef(replying);
+  useEffect(() => { replyModeRef.current = replyMode; }, [replyMode]);
+  useEffect(() => { replyingRef.current = replying; }, [replying]);
   useEffect(() => { loadingRef.current = loading; }, [loading]);
   useEffect(() => { articleRef.current = article; }, [article]);
   useEffect(() => { contentHeightRef.current = contentHeight; }, [contentHeight]);
@@ -72,7 +80,16 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
   };
 
   useInput((input, key) => {
+    if (replyingRef.current) return;
+    if (replyModeRef.current) {
+      if (key.escape) { setReplyMode(false); setReplyInput(''); setReplyStatus(''); }
+      return;
+    }
+  });
+
+  useInput((input, key) => {
     if (loadingRef.current) return;
+    if (replyModeRef.current || replyingRef.current) return;
 
     if (input === 'q' || key.escape) {
       onBack();
@@ -108,7 +125,13 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
       else if (key.pageUp || input === 'u') setCmtScroll(s => Math.max(0, s - 5));
       else if (input === 'g') setCmtScroll(0);
       else if (input === 'G') setCmtScroll(maxScroll);
-      else if (input === 'r') loadComments();
+      else if (input === 'R') loadComments();
+      else if (input === 'r') {
+        if (!auth) { setReplyStatus('请先登录后再回复'); setTimeout(() => setReplyStatus(''), 2000); return; }
+        setReplyInput('');
+        setReplyStatus('');
+        setReplyMode(true);
+      }
     }
   });
 
@@ -179,7 +202,24 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
 
   const statusBar = tab === 'article'
     ? `↑↓/jk 滚动  d/u 半页  g/G 首尾  o 浏览器  c 评论  l 登录  q 返回`
-    : `↑↓/jk 滚动  d/u 半页  g/G 首尾  r 刷新  c 正文  l 登录  q 返回`;
+    : `↑↓/jk 滚动  d/u 半页  r 回复  R 刷新  c 正文  l 登录  q 返回`;
+
+  const submitReply = async () => {
+    const art = articleRef.current;
+    const scroll = cmtScrollRef.current;
+    if (!art || replyInput.trim().length < 2) return;
+    setReplyMode(false);
+    setReplying(true);
+    setReplyStatus('正在打开评论页...');
+    const result = await replyComment(art.docid, scroll, replyInput.trim(), setReplyStatus);
+    setReplying(false);
+    setReplyStatus(result.message);
+    if (result.ok) {
+      setTimeout(() => { setReplyStatus(''); loadComments(); }, 1500);
+    } else {
+      setTimeout(() => setReplyStatus(''), 3000);
+    }
+  };
 
   return (
     <Box flexDirection="column" width={termWidth} height={termHeight}>
@@ -215,9 +255,21 @@ export function ArticleView({ article, loading, onBack, auth, onLogin }: Article
                 </Box>
               ) : threads.length === 0 ? (
                 <Box paddingX={2} paddingY={1}>
-                  <Text color="gray">暂无评论，按 r 重试</Text>
+                  <Text color="gray">暂无评论，按 R 刷新</Text>
                 </Box>
               ) : renderThreads()}
+            </Box>
+          )}
+
+          {replyMode && (
+            <Box borderStyle="single" borderColor="cyan" paddingX={1}>
+              <Text color="cyan">回复 › </Text>
+              <TextInput
+                value={replyInput}
+                onChange={setReplyInput}
+                onSubmit={submitReply}
+                placeholder="输入回复内容，Enter 提交，Esc 取消..."
+              />
             </Box>
           )}
         </>
