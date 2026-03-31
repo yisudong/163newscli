@@ -4,26 +4,54 @@ import { render, useApp, useInput } from 'ink';
 import { Menu } from './components/Menu.js';
 import { NewsList } from './components/NewsList.js';
 import { ArticleView } from './components/ArticleView.js';
+import { LoginModal } from './components/LoginModal.js';
 import { fetchChannel, fetchArticle } from './api/index.js';
+import { loadAuth } from './auth/index.js';
+import type { AuthState } from './auth/index.js';
 import type { NewsItem, ArticleDetail, Channel } from './types.js';
 
-type Screen = 'menu' | 'list' | 'article';
+type Screen = 'menu' | 'list' | 'article' | 'login';
 
 function App() {
   const { exit } = useApp();
   const [screen, setScreen] = useState<Screen>('menu');
+  const [prevScreen, setPrevScreen] = useState<Screen>('menu');
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
   const [newsList, setNewsList] = useState<NewsItem[]>([]);
   const [listLoading, setListLoading] = useState(false);
   const [article, setArticle] = useState<ArticleDetail | null>(null);
   const [articleLoading, setArticleLoading] = useState(false);
+  const [auth, setAuth] = useState<AuthState | null>(null);
 
-  // 全局退出键（仅在菜单页）
+  useEffect(() => {
+    setAuth(loadAuth());
+  }, []);
+
   useInput((input) => {
+    if (screen === 'login') return;
+    if (input === 'l' || input === 'L') {
+      setPrevScreen(screen);
+      setScreen('login');
+      return;
+    }
     if (screen === 'menu' && (input === 'q' || input === 'Q')) {
       exit();
     }
   });
+
+  const openLogin = () => {
+    setPrevScreen(screen);
+    setScreen('login');
+  };
+
+  const handleLoginDone = (newAuth: AuthState | null) => {
+    setAuth(newAuth);
+    setScreen(prevScreen);
+  };
+
+  const handleLoginClose = () => {
+    setScreen(prevScreen);
+  };
 
   const loadChannel = async (channel: Channel) => {
     setCurrentChannel(channel);
@@ -33,7 +61,7 @@ function App() {
     try {
       const items = await fetchChannel(channel);
       setNewsList(items);
-    } catch (e) {
+    } catch {
       setNewsList([]);
     } finally {
       setListLoading(false);
@@ -54,8 +82,18 @@ function App() {
     }
   };
 
+  if (screen === 'login') {
+    return (
+      <LoginModal
+        auth={auth}
+        onDone={handleLoginDone}
+        onClose={handleLoginClose}
+      />
+    );
+  }
+
   if (screen === 'menu') {
-    return <Menu onSelect={loadChannel} />;
+    return <Menu onSelect={loadChannel} auth={auth} onLogin={openLogin} />;
   }
 
   if (screen === 'list' && currentChannel) {
@@ -67,6 +105,8 @@ function App() {
         onSelect={loadArticle}
         onBack={() => setScreen('menu')}
         onRefresh={() => loadChannel(currentChannel)}
+        auth={auth}
+        onLogin={openLogin}
       />
     );
   }
@@ -77,6 +117,8 @@ function App() {
         article={article}
         loading={articleLoading}
         onBack={() => setScreen('list')}
+        auth={auth}
+        onLogin={openLogin}
       />
     );
   }

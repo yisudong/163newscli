@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput, useStdout } from 'ink';
 import type { Channel } from '../types.js';
+import type { AuthState } from '../auth/index.js';
 import { CHANNELS } from '../api/index.js';
 
 interface MenuProps {
   onSelect: (channel: Channel) => void;
+  auth: AuthState | null;
+  onLogin: () => void;
 }
 
-export function Menu({ onSelect }: MenuProps) {
+export function Menu({ onSelect, auth, onLogin }: MenuProps) {
   const [cursor, setCursor] = useState(0);
   const { stdout } = useStdout();
   const termWidth = stdout.columns || 80;
@@ -29,8 +32,6 @@ export function Menu({ onSelect }: MenuProps) {
       }
     }
   });
-
-  // figlet ANSI Shadow "163 NEWS" — 正确版本
   const banner = [
     ' ██╗ ██████╗ ██████╗     ███╗   ██╗███████╗██╗    ██╗███████╗',
     '███║██╔════╝ ╚════██╗    ████╗  ██║██╔════╝██║    ██║██╔════╝',
@@ -79,7 +80,8 @@ export function Menu({ onSelect }: MenuProps) {
       </Box>
 
       <Box marginTop={1}>
-        <Text color="gray">↑↓ 移动  Enter/数字 选择  q 退出</Text>
+        <Text color="gray">↑↓ 移动  Enter/数字 选择  l 登录  q 退出</Text>
+        <Text color={auth ? 'green' : 'gray'}>{'  '}{auth ? `🔐 ${auth.nickname || '已登录'}` : '⬜ 未登录'}</Text>
       </Box>
     </Box>
   );

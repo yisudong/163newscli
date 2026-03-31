@@ -1,11 +1,22 @@
 import axios from 'axios';
 import type { NewsItem, ArticleDetail, Comment, CommentThread, Channel, ChannelKey } from '../types.js';
+import { loadAuth, getCookieHeader } from '../auth/index.js';
 
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1';
 
 const http = axios.create({
   headers: { 'User-Agent': UA },
   timeout: 10000,
+});
+
+http.interceptors.request.use((config) => {
+  const auth = loadAuth();
+  const cookie = getCookieHeader(auth);
+  if (cookie) {
+    config.headers = config.headers ?? {};
+    config.headers['Cookie'] = cookie;
+  }
+  return config;
 });
 
 export const CHANNELS: Channel[] = [
@@ -176,5 +187,31 @@ export async function fetchComments(docid: string, limit = 20): Promise<CommentT
       .filter(t => t.comments.length > 0);
   } catch {
     return [];
+  }
+}
+
+export async function voteComment(
+  docid: string,
+  commentId: string | number,
+  voteType: 1 | -1 = 1
+): Promise<boolean> {
+  try {
+    const auth = loadAuth();
+    if (!auth?.cookies?.length) return false;
+    const cookie = getCookieHeader(auth);
+    const { data, status } = await http.post(
+      `https://comment.api.163.com/api/v1/products/${COMMENT_PRODUCT_ID}/threads/${docid}/comments/${commentId}/vote`,
+      { vote: voteType },
+      {
+        headers: {
+          'Cookie': cookie,
+          'Content-Type': 'application/json',
+          'Referer': 'https://news.163.com/',
+        },
+      }
+    );
+    return status === 200 && !data?.message;
+  } catch {
+    return false;
   }
 }

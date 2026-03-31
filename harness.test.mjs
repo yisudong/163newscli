@@ -145,6 +145,27 @@ function assert(name, cond, detail = '') {
   assert('ArticleView 评论 buildLevel 盖楼渲染', articleSrc.includes('buildLevel'));
   assert('ArticleView 评论行使用 padEndWidth 而非 padEnd', articleSrc.includes('padEndWidth') && !articleSrc.includes('.padEnd('));
 
+  // ---- TEST 10: 登录功能 ----
+  console.log('\n📋 [10] 登录功能静态验证');
+  const authSrc = fs.readFileSync('./dist/auth/index.js', 'utf8');
+  const loginModalSrc = fs.readFileSync('./dist/components/LoginModal.js', 'utf8');
+  const cliSrc = fs.readFileSync('./dist/cli.js', 'utf8');
+
+  assert('auth 模块有 loadAuth', authSrc.includes('loadAuth'));
+  assert('auth 模块有 saveAuth', authSrc.includes('saveAuth'));
+  assert('auth 模块有 clearAuth', authSrc.includes('clearAuth'));
+  assert('auth 模块有 getCookieHeader', authSrc.includes('getCookieHeader'));
+  assert('auth 模块有 loginWithBrowser', authSrc.includes('loginWithBrowser'));
+  assert('auth Cookie 存储到 ~/.163newscli', authSrc.includes('.163newscli'));
+  assert('LoginModal 组件存在', loginModalSrc.includes('LoginModal'));
+  assert('LoginModal 支持退出登录', loginModalSrc.includes('clearAuth'));
+  assert('cli 有登录状态 auth', cliSrc.includes('auth'));
+  assert('cli l 键触发登录', cliSrc.includes("'l'") || cliSrc.includes('"l"'));
+  assert('Menu 显示登录状态', menuSrc.includes('auth'));
+  assert('NewsList 显示登录状态', listSrc.includes('auth'));
+  assert('ArticleView 有 voteComment', articleSrc.includes('voteComment'));
+  assert('ArticleView v 键点赞', articleSrc.includes("'v'") || articleSrc.includes('"v"'));
+
   // ---- 汇总 ----
   console.log('\n' + '='.repeat(50));
   console.log(`结果: ${PASS} 通过 ${passed}  ${FAIL} 失败 ${failed}  总计 ${passed + failed}`);

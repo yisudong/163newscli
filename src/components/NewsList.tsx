@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text, useInput, useStdout } from 'ink';
 import type { NewsItem } from '../types.js';
+import type { AuthState } from '../auth/index.js';
 import { formatTime, truncate, padEndWidth } from '../utils/text.js';
 
 interface NewsListProps {
@@ -10,9 +11,11 @@ interface NewsListProps {
   onSelect: (item: NewsItem) => void;
   onBack: () => void;
   onRefresh: () => void;
+  auth: AuthState | null;
+  onLogin: () => void;
 }
 
-export function NewsList({ title, items, loading, onSelect, onBack, onRefresh }: NewsListProps) {
+export function NewsList({ title, items, loading, onSelect, onBack, onRefresh, auth, onLogin }: NewsListProps) {
   const [cursor, setCursor] = useState(0);
   const [offset, setOffset] = useState(0);
   const { stdout } = useStdout();
@@ -129,8 +132,9 @@ export function NewsList({ title, items, loading, onSelect, onBack, onRefresh }:
       {/* 底部提示 */}
       <Box borderStyle="single" borderColor="gray" paddingX={1}>
         <Text color="gray">
-          ↑↓/jk 选择  PgDn/u 翻页  Enter 阅读  r 刷新  q/Esc 返回
+          ↑↓/jk 选择  PgDn/u 翻页  Enter 阅读  r 刷新  l 登录  q/Esc 返回
         </Text>
+        <Text color={auth ? 'green' : 'gray'}>{'  '}{auth ? `🔐 ${auth.nickname || '已登录'}` : '⬜ 未登录'}</Text>
       </Box>
     </Box>
   );

@@ -2,21 +2,25 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text, useInput, useStdout } from 'ink';
 import { exec } from 'child_process';
 import type { ArticleDetail, CommentThread } from '../types.js';
+import type { AuthState } from '../auth/index.js';
 import { htmlToText, wrapText, formatTime, truncate, padEndWidth } from '../utils/text.js';
-import { fetchComments } from '../api/index.js';
+import { fetchComments, voteComment } from '../api/index.js';
 
 interface ArticleViewProps {
   article: ArticleDetail | null;
   loading: boolean;
   onBack: () => void;
+  auth: AuthState | null;
+  onLogin: () => void;
 }
 
-export function ArticleView({ article, loading, onBack }: ArticleViewProps) {
+export function ArticleView({ article, loading, onBack, auth, onLogin }: ArticleViewProps) {
   const [scrollTop, setScrollTop] = useState(0);
   const [tab, setTab] = useState<'article' | 'comments'>('article');
   const [threads, setThreads] = useState<CommentThread[]>([]);
   const [cmtLoading, setCmtLoading] = useState(false);
   const [cmtScroll, setCmtScroll] = useState(0);
+  const [voteMsg, setVoteMsg] = useState('');
 
   const { stdout } = useStdout();
   const termWidth = stdout.columns || 80;
@@ -106,6 +110,17 @@ export function ArticleView({ article, loading, onBack }: ArticleViewProps) {
       else if (input === 'g') setCmtScroll(0);
       else if (input === 'G') setCmtScroll(maxScroll);
       else if (input === 'r') loadComments();
+      else if (input === 'v') {
+        const art = articleRef.current;
+        const ts2 = threadsRef.current;
+        const scroll = cmtScrollRef.current;
+        if (!art || !ts2[scroll]?.comments?.[0]) return;
+        const c = ts2[scroll].comments[0];
+        voteComment(art.docid, c.commentId).then(ok => {
+          setVoteMsg(ok ? '👍 点赞成功！' : '❌ 点赞失败（需要登录）');
+          setTimeout(() => setVoteMsg(''), 2000);
+        });
+      }
     }
   });
 
@@ -175,8 +190,8 @@ export function ArticleView({ article, loading, onBack }: ArticleViewProps) {
   };
 
   const statusBar = tab === 'article'
-    ? `↑↓/jk 滚动  d/u 半页  g/G 首尾  o 浏览器  c 评论  q 返回`
-    : `↑↓/jk 滚动  d/u 半页  g/G 首尾  r 刷新  c 正文  q 返回`;
+    ? `↑↓/jk 滚动  d/u 半页  g/G 首尾  o 浏览器  c 评论  l 登录  q 返回`
+    : `↑↓/jk 滚动  d/u 半页  g/G 首尾  v 点赞  r 刷新  c 正文  l 登录  q 返回`;
 
   return (
     <Box flexDirection="column" width={termWidth} height={termHeight}>
@@ -232,6 +247,8 @@ export function ArticleView({ article, loading, onBack }: ArticleViewProps) {
         {tab === 'comments' && threads.length > 0 && (
           <Text color="gray">  [{cmtScroll + 1}/{threads.length}条]</Text>
         )}
+        {voteMsg && <Text color={voteMsg.startsWith('👍') ? 'green' : 'red'}>  {voteMsg}</Text>}
+        <Text color={auth ? 'green' : 'gray'}>{'  '}{auth ? `🔐 ${auth.nickname || '已登录'}` : '⬜ 未登录'}</Text>
       </Box>
     </Box>
   );
