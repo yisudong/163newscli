@@ -190,28 +190,4 @@ export async function fetchComments(docid: string, limit = 20): Promise<CommentT
   }
 }
 
-export async function voteComment(
-  docid: string,
-  commentId: string | number,
-  voteType: 1 | -1 = 1
-): Promise<boolean> {
-  try {
-    const auth = loadAuth();
-    if (!auth?.cookies?.length) return false;
-    const cookie = getCookieHeader(auth);
-    const { data, status } = await http.post(
-      `https://comment.api.163.com/api/v1/products/${COMMENT_PRODUCT_ID}/threads/${docid}/comments/${commentId}/vote`,
-      { vote: voteType },
-      {
-        headers: {
-          'Cookie': cookie,
-          'Content-Type': 'application/json',
-          'Referer': 'https://news.163.com/',
-        },
-      }
-    );
-    return status === 200 && !data?.message;
-  } catch {
-    return false;
-  }
-}
+

@@ -163,8 +163,9 @@ function assert(name, cond, detail = '') {
   assert('cli l 键触发登录', cliSrc.includes("'l'") || cliSrc.includes('"l"'));
   assert('Menu 显示登录状态', menuSrc.includes('auth'));
   assert('NewsList 显示登录状态', listSrc.includes('auth'));
-  assert('ArticleView 有 voteComment', articleSrc.includes('voteComment'));
-  assert('ArticleView v 键点赞', articleSrc.includes("'v'") || articleSrc.includes('"v"'));
+  assert('ArticleView 不含 voteComment（已移除点赞）', !articleSrc.includes('voteComment'));
+  const apiSrc = fs.readFileSync('./dist/api/index.js', 'utf8');
+  assert('api 不含 voteComment（已移除点赞）', !apiSrc.includes('voteComment'));
 
   // ---- TEST 11: 登录流程健壮性验证 ----
   console.log('\n📋 [11] 登录流程健壮性验证');
