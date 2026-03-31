@@ -94,6 +94,15 @@ function assert(name, cond, detail = '') {
   assert('ArticleView 撑满高度 height={termHeight}', articleSrc.includes('height: termHeight'));
   assert('ArticleView 正文区有 overflow hidden', articleSrc.includes('overflow') && articleSrc.includes('hidden'));
 
+  // ---- TEST 8: 菜单项 emoji 宽度一致性 ----
+  console.log('\n📋 [8] 菜单 emoji 宽度一致性');
+  assert('体育频道不使用窄 emoji ⚽', !CHANNELS.find(c => c.key === 'sports')?.label.includes('⚽'));
+  const labelWidths = CHANNELS.slice(1).map(ch => {
+    let w = 0; for (const c of ch.label) w += c.codePointAt(0) > 0xFFFF ? 2 : (c.charCodeAt(0) > 127 ? 2 : 1);
+    return w;
+  });
+  assert('非热搜各频道 label 显示宽度一致', new Set(labelWidths).size === 1, `宽度: ${labelWidths}`);
+
   // ---- 汇总 ----
   console.log('\n' + '='.repeat(50));
   console.log(`结果: ${PASS} 通过 ${passed}  ${FAIL} 失败 ${failed}  总计 ${passed + failed}`);
