@@ -166,6 +166,17 @@ function assert(name, cond, detail = '') {
   assert('ArticleView 有 voteComment', articleSrc.includes('voteComment'));
   assert('ArticleView v 键点赞', articleSrc.includes("'v'") || articleSrc.includes('"v"'));
 
+  // ---- TEST 11: 登录流程健壮性验证 ----
+  console.log('\n📋 [11] 登录流程健壮性验证');
+  assert('loginWithBrowser 不使用 async Promise executor（无 new Promise(async）', !authSrc.includes('new Promise(async'));
+  assert('loginWithBrowser 不使用 page.on response 监听', !authSrc.includes("page.on('response'") && !authSrc.includes('page.on("response"'));
+  assert('loginWithBrowser 使用 setInterval 纯轮询', authSrc.includes('setInterval'));
+  assert('loginWithBrowser 有 cleanup 函数（clearInterval + browser.close）', authSrc.includes('clearInterval') && authSrc.includes('browser.close'));
+  assert('loginWithBrowser 使用 news.163.com 而非 passport.163.com 作为起始页', authSrc.includes('news.163.com') && !authSrc.includes('passport.163.com/login/'));
+  assert('loginWithBrowser 有 fallback（goto about:blank）', authSrc.includes('about:blank'));
+  assert('loginWithBrowser 有超时保护（180000）', authSrc.includes('180000'));
+  assert('loginWithBrowser 外层有 try/catch 包裹 chromium.launch', authSrc.includes('chromium.launch'));
+
   // ---- 汇总 ----
   console.log('\n' + '='.repeat(50));
   console.log(`结果: ${PASS} 通过 ${passed}  ${FAIL} 失败 ${failed}  总计 ${passed + failed}`);

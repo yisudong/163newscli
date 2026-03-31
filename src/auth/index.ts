@@ -68,85 +68,106 @@ export async function loginWithBrowser(
   onStatus: (msg: string) => void
 ): Promise<AuthState | null> {
   onStatus('正在启动浏览器...');
-  const browser = await chromium.launch({ headless: false });
-  const context = await browser.newContext();
-  const page = await context.newPage();
 
-  onStatus('浏览器已打开，请在页面右上角登录网易账号...');
-  await page.goto('https://passport.163.com/login/');
-
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null;
+  let poll: ReturnType<typeof setInterval> | null = null;
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
   let resolved = false;
-  let authState: AuthState | null = null;
 
-  return new Promise(async (resolve) => {
-    const checkCookies = async () => {
-      if (resolved) return;
-      const cookies = await context.cookies();
-      const hasAuth = cookies.some(c => KEY_COOKIES.includes(c.name));
-      if (hasAuth) {
+  const cleanup = async () => {
+    if (poll !== null) { clearInterval(poll); poll = null; }
+    if (timeoutHandle !== null) { clearTimeout(timeoutHandle); timeoutHandle = null; }
+    if (browser !== null) {
+      try { await browser.close(); } catch { }
+      browser = null;
+    }
+  };
+
+  try {
+    browser = await chromium.launch({ headless: false });
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    try {
+      await page.goto('https://news.163.com/', {
+        timeout: 15000,
+        waitUntil: 'domcontentloaded',
+      });
+      onStatus('浏览器已打开 news.163.com，请点击右上角"登录"完成账号登录...');
+    } catch {
+      try {
+        await page.goto('about:blank');
+        await page.setContent(
+          '<body style="font:20px sans-serif;padding:40px">' +
+          '<h2>请手动导航到 <a href="https://news.163.com">news.163.com</a> 并登录账号</h2>' +
+          '</body>'
+        );
+      } catch { }
+      onStatus('首页加载失败，请在浏览器地址栏手动输入 news.163.com 后登录...');
+    }
+
+    return await new Promise<AuthState | null>((resolve) => {
+      const finish = async (result: AuthState | null) => {
+        if (resolved) return;
         resolved = true;
-        const stored: StoredCookie[] = cookies
-          .filter(c => PASSPORT_DOMAINS.some(d => c.domain.endsWith(d.replace(/^\./, ''))))
-          .map(c => ({
-            name: c.name,
-            value: c.value,
-            domain: c.domain,
-            path: c.path,
-            expires: c.expires,
-            httpOnly: c.httpOnly,
-            secure: c.secure,
-          }));
+        await cleanup();
+        resolve(result);
+      };
 
-        let nickname = '';
+      const checkCookies = async () => {
+        if (resolved) return;
         try {
-          nickname = await page.evaluate(() => {
-            const el = document.querySelector('.username, .loginname, [class*="nick"], [class*="user-name"]');
-            return el?.textContent?.trim() || '';
-          });
+          const cookies = await context.cookies();
+          const hasAuth = cookies.some(c => KEY_COOKIES.includes(c.name));
+          if (!hasAuth) return;
+
+          const stored: StoredCookie[] = cookies
+            .filter(c => PASSPORT_DOMAINS.some(d => c.domain.endsWith(d.replace(/^\./, ''))))
+            .map(c => ({
+              name: c.name,
+              value: c.value,
+              domain: c.domain,
+              path: c.path,
+              expires: c.expires,
+              httpOnly: c.httpOnly,
+              secure: c.secure,
+            }));
+
+          let nickname = '';
+          try {
+            nickname = await page.evaluate(() => {
+              const el = document.querySelector(
+                '.username, .loginname, [class*="nick"], [class*="user-name"], .ntes-icn-login'
+              );
+              return el?.textContent?.trim() || '';
+            });
+          } catch { }
+
+          const authState: AuthState = { cookies: stored, nickname, savedAt: Date.now() };
+          saveAuth(authState);
+          onStatus(`登录成功！${nickname ? `欢迎，${nickname}` : ''}`);
+
+          setTimeout(() => finish(authState), 1500);
         } catch { }
+      };
 
-        authState = { cookies: stored, nickname, savedAt: Date.now() };
-        saveAuth(authState);
-        onStatus(`登录成功！${nickname ? `欢迎，${nickname}` : ''}`);
-        setTimeout(async () => {
-          try { await browser.close(); } catch { }
-          resolve(authState);
-        }, 1500);
-      }
-    };
+      poll = setInterval(checkCookies, 2000);
 
-    page.on('response', async () => {
-      setTimeout(checkCookies, 500);
-    });
+      browser!.on('disconnected', () => {
+        if (!resolved) {
+          onStatus('浏览器已关闭');
+          finish(null);
+        }
+      });
 
-    page.on('close', async () => {
-      if (!resolved) {
-        resolved = true;
-        try { await browser.close(); } catch { }
-        resolve(null);
-      }
-    });
-
-    browser.on('disconnected', () => {
-      if (!resolved) {
-        resolved = true;
-        resolve(null);
-      }
-    });
-
-    const poll = setInterval(async () => {
-      if (resolved) { clearInterval(poll); return; }
-      await checkCookies();
-    }, 2000);
-
-    setTimeout(() => {
-      if (!resolved) {
-        resolved = true;
-        clearInterval(poll);
+      timeoutHandle = setTimeout(() => {
         onStatus('登录超时（3分钟），已取消');
-        browser.close().catch(() => { });
-        resolve(null);
-      }
-    }, 180000);
-  });
+        finish(null);
+      }, 180000);
+    });
+  } catch (err) {
+    await cleanup();
+    onStatus(`启动浏览器失败：${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  }
 }
