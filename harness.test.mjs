@@ -121,22 +121,29 @@ function assert(name, cond, detail = '') {
   // ---- TEST 9: 评论接口 ----
   console.log('\n📋 [9] 评论接口');
   const { fetchComments } = await import('./dist/api/index.js');
-  const cmts = await fetchComments(hot[0].docid);
-  assert('fetchComments 返回数组', Array.isArray(cmts));
-  if (cmts.length > 0) {
-    assert('评论有 commentId', cmts[0]?.commentId != null);
-    assert('评论有 content', (cmts[0]?.content?.length ?? 0) > 0);
-    assert('评论有 nickName', (cmts[0]?.nickName?.length ?? 0) > 0);
-    assert('评论有 createTime', (cmts[0]?.createTime?.length ?? 0) > 0);
+  const threads = await fetchComments(hot[0].docid);
+  assert('fetchComments 返回数组', Array.isArray(threads));
+  if (threads.length > 0) {
+    const firstThread = threads[0];
+    assert('评论 thread 有 comments 数组', Array.isArray(firstThread?.comments));
+    const c = firstThread?.comments?.[0];
+    assert('评论有 commentId', c?.commentId != null);
+    assert('评论有 content', (c?.content?.length ?? 0) > 0);
+    assert('评论有 nickName', (c?.nickName?.length ?? 0) > 0);
+    assert('评论有 createTime', (c?.createTime?.length ?? 0) > 0);
+    assert('评论有 buildLevel', typeof c?.buildLevel === 'number');
+    assert('主楼 buildLevel 为 1', c?.buildLevel === 1);
+  }
+  const multiThread = threads.find(t => t.comments.length > 1);
+  if (multiThread) {
+    assert('盖楼链子楼 buildLevel > 1', multiThread.comments[1]?.buildLevel > 1);
   }
   assert('ArticleView 有评论状态 tab', articleSrc.includes('tab'));
   assert('ArticleView 有 fetchComments 引用', articleSrc.includes('fetchComments'));
   assert('ArticleView c 键切换评论', articleSrc.includes("'c'") || articleSrc.includes('"c"'));
   assert('ArticleDetail 含 replyCount 字段', articleSrc.includes('replyCount'));
-  assert('ArticleView 评论 branches 子评论提示', articleSrc.includes('branches'));
-  if (cmts.length > 0) {
-    assert('评论 branches 字段为数字', typeof cmts[0].branches === 'number');
-  }
+  assert('ArticleView 评论 buildLevel 盖楼渲染', articleSrc.includes('buildLevel'));
+  assert('ArticleView 评论行使用 padEndWidth 而非 padEnd', articleSrc.includes('padEndWidth') && !articleSrc.includes('.padEnd('));
 
   // ---- 汇总 ----
   console.log('\n' + '='.repeat(50));

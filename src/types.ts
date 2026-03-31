@@ -7,6 +7,12 @@ export interface Comment {
   createTime: string;
   ip?: string;
   branches?: number;
+  buildLevel?: number;
+  location?: string;
+}
+
+export interface CommentThread {
+  comments: Comment[];
 }
 
 export interface NewsItem {

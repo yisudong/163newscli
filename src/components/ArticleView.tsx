@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text, useInput, useStdout } from 'ink';
 import { exec } from 'child_process';
-import type { ArticleDetail, Comment } from '../types.js';
-import { htmlToText, wrapText, formatTime, truncate, padEndWidth, displayWidth } from '../utils/text.js';
+import type { ArticleDetail, CommentThread } from '../types.js';
+import { htmlToText, wrapText, formatTime, truncate, padEndWidth } from '../utils/text.js';
 import { fetchComments } from '../api/index.js';
 
 interface ArticleViewProps {
@@ -14,7 +14,7 @@ interface ArticleViewProps {
 export function ArticleView({ article, loading, onBack }: ArticleViewProps) {
   const [scrollTop, setScrollTop] = useState(0);
   const [tab, setTab] = useState<'article' | 'comments'>('article');
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [threads, setThreads] = useState<CommentThread[]>([]);
   const [cmtLoading, setCmtLoading] = useState(false);
   const [cmtScroll, setCmtScroll] = useState(0);
 
@@ -31,7 +31,7 @@ export function ArticleView({ article, loading, onBack }: ArticleViewProps) {
   const articleRef = useRef(article);
   const contentHeightRef = useRef(contentHeight);
   const tabRef = useRef(tab);
-  const commentsRef = useRef(comments);
+  const threadsRef = useRef(threads);
   const cmtLoadingRef = useRef(cmtLoading);
   const cmtScrollRef = useRef(cmtScroll);
 
@@ -40,14 +40,14 @@ export function ArticleView({ article, loading, onBack }: ArticleViewProps) {
   useEffect(() => { articleRef.current = article; }, [article]);
   useEffect(() => { contentHeightRef.current = contentHeight; }, [contentHeight]);
   useEffect(() => { tabRef.current = tab; }, [tab]);
-  useEffect(() => { commentsRef.current = comments; }, [comments]);
+  useEffect(() => { threadsRef.current = threads; }, [threads]);
   useEffect(() => { cmtLoadingRef.current = cmtLoading; }, [cmtLoading]);
   useEffect(() => { cmtScrollRef.current = cmtScroll; }, [cmtScroll]);
 
   useEffect(() => {
     setScrollTop(0);
     setTab('article');
-    setComments([]);
+    setThreads([]);
     setCmtScroll(0);
     if (article) {
       const text = htmlToText(article.body);
@@ -61,10 +61,10 @@ export function ArticleView({ article, loading, onBack }: ArticleViewProps) {
     const art = articleRef.current;
     if (!art || cmtLoadingRef.current) return;
     setCmtLoading(true);
-    setComments([]);
+    setThreads([]);
     setCmtScroll(0);
     const list = await fetchComments(art.docid);
-    setComments(list);
+    setThreads(list);
     setCmtLoading(false);
   };
 
@@ -79,7 +79,7 @@ export function ArticleView({ article, loading, onBack }: ArticleViewProps) {
     if (input === 'c') {
       const nextTab = tabRef.current === 'article' ? 'comments' : 'article';
       setTab(nextTab);
-      if (nextTab === 'comments' && commentsRef.current.length === 0 && !cmtLoadingRef.current) {
+      if (nextTab === 'comments' && threadsRef.current.length === 0 && !cmtLoadingRef.current) {
         loadComments();
       }
       return;
@@ -97,12 +97,14 @@ export function ArticleView({ article, loading, onBack }: ArticleViewProps) {
       else if (input === 'G') setScrollTop(maxScroll);
       else if (input === 'o') { const link = articleRef.current?.shareLink; if (link) exec(`open "${link}"`); }
     } else {
-      const ch = contentHeightRef.current;
-      const maxScroll = Math.max(0, commentsRef.current.length - ch);
+      const ts = threadsRef.current;
+      const maxScroll = Math.max(0, ts.length - 1);
       if (key.upArrow || input === 'k') setCmtScroll(s => Math.max(0, s - 1));
       else if (key.downArrow || input === 'j') setCmtScroll(s => Math.min(maxScroll, s + 1));
-      else if (key.pageDown || input === 'd') setCmtScroll(s => Math.min(maxScroll, s + Math.floor(ch / 2)));
-      else if (key.pageUp || input === 'u') setCmtScroll(s => Math.max(0, s - Math.floor(ch / 2)));
+      else if (key.pageDown || input === 'd') setCmtScroll(s => Math.min(maxScroll, s + 5));
+      else if (key.pageUp || input === 'u') setCmtScroll(s => Math.max(0, s - 5));
+      else if (input === 'g') setCmtScroll(0);
+      else if (input === 'G') setCmtScroll(maxScroll);
       else if (input === 'r') loadComments();
     }
   });
@@ -112,15 +114,69 @@ export function ArticleView({ article, loading, onBack }: ArticleViewProps) {
     ? Math.round((scrollTop / Math.max(1, lines.length - contentHeight)) * 100)
     : 100;
 
-  const visibleComments = comments.slice(cmtScroll, cmtScroll + contentHeight);
   const nameWidth = 10;
-  const voteWidth = 6;
+  const voteWidth = 7;
   const timeWidth = 11;
-  const cmtContentWidth = Math.max(10, contentWidth - nameWidth - voteWidth - timeWidth - 3);
+
+  const renderThreads = () => {
+    const rows: React.ReactNode[] = [];
+    const visible = threads.slice(cmtScroll, cmtScroll + contentHeight);
+
+    for (let ti = 0; ti < visible.length; ti++) {
+      const thread = visible[ti];
+      const isMulti = thread.comments.length > 1;
+
+      for (let ci = 0; ci < thread.comments.length; ci++) {
+        const c = thread.comments[ci];
+        const level = c.buildLevel ?? 1;
+        const indent = (level - 1) * 2;
+        const isLast = ci === thread.comments.length - 1;
+        const indentStr = ' '.repeat(indent);
+
+        if (level === 1) {
+          const mainContentW = Math.max(10, contentWidth - nameWidth - voteWidth - timeWidth - 3);
+          rows.push(
+            <Box key={`${ti}-${ci}`} paddingX={1}>
+              <Text color="cyan">{padEndWidth(truncate(c.nickName, nameWidth), nameWidth)}</Text>
+              <Text> </Text>
+              <Text bold={false}>{padEndWidth(truncate(c.content, mainContentW), mainContentW)}</Text>
+              <Text> </Text>
+              <Text color="yellow">{padEndWidth(c.vote > 0 ? `👍${c.vote}` : '', voteWidth)}</Text>
+              <Text color="gray"> {c.createTime.slice(5, 16)}</Text>
+            </Box>
+          );
+        } else {
+          const prefix = isLast ? '└' : '├';
+          const levelStr = `${level}F`;
+          const prefixFull = `${indentStr}${prefix}${levelStr} `;
+          const prefixW = indent + 1 + levelStr.length + 1;
+          const replyContentW = Math.max(10, contentWidth - prefixW - nameWidth - 3);
+          rows.push(
+            <Box key={`${ti}-${ci}`} paddingX={1}>
+              <Text color="gray">{prefixFull}</Text>
+              <Text color="cyan">{padEndWidth(truncate(c.nickName, nameWidth), nameWidth)}</Text>
+              <Text> </Text>
+              <Text color="white">{truncate(c.content, replyContentW)}</Text>
+            </Box>
+          );
+        }
+      }
+
+      if (isMulti && ti < visible.length - 1) {
+        rows.push(
+          <Box key={`sep-${ti}`} paddingX={1}>
+            <Text color="gray">{'─'.repeat(Math.max(0, contentWidth - 2))}</Text>
+          </Box>
+        );
+      }
+    }
+
+    return rows;
+  };
 
   const statusBar = tab === 'article'
     ? `↑↓/jk 滚动  d/u 半页  g/G 首尾  o 浏览器  c 评论  q 返回`
-    : `↑↓/jk 滚动  d/u 半页  r 刷新  c 正文  q 返回`;
+    : `↑↓/jk 滚动  d/u 半页  g/G 首尾  r 刷新  c 正文  q 返回`;
 
   return (
     <Box flexDirection="column" width={termWidth} height={termHeight}>
@@ -154,23 +210,11 @@ export function ArticleView({ article, loading, onBack }: ArticleViewProps) {
                 <Box paddingX={2} paddingY={1}>
                   <Text color="yellow">⏳ 加载评论...</Text>
                 </Box>
-              ) : comments.length === 0 ? (
+              ) : threads.length === 0 ? (
                 <Box paddingX={2} paddingY={1}>
                   <Text color="gray">暂无评论，按 r 重试</Text>
                 </Box>
-              ) : (
-                visibleComments.map((c, i) => (
-                  <Box key={c.commentId} paddingX={1}>
-                    <Text color="cyan">{padEndWidth(truncate(c.nickName, nameWidth), nameWidth)}</Text>
-                    <Text> </Text>
-                    <Text>{padEndWidth(truncate(c.content, cmtContentWidth), cmtContentWidth)}</Text>
-                    <Text> </Text>
-                    <Text color="gray">{padEndWidth(c.vote > 0 ? `👍${c.vote}` : '', voteWidth)}</Text>
-                    <Text color="gray"> {c.createTime.slice(5, 16)}</Text>
-                    {(c.branches ?? 0) > 0 && <Text color="gray"> 💬{c.branches}</Text>}
-                  </Box>
-                ))
-              )}
+              ) : renderThreads()}
             </Box>
           )}
         </>
@@ -185,8 +229,8 @@ export function ArticleView({ article, loading, onBack }: ArticleViewProps) {
         {tab === 'article' && lines.length > contentHeight && (
           <Text color="gray">  [{scrollTop + 1}/{lines.length}行 {progress}%]</Text>
         )}
-        {tab === 'comments' && comments.length > 0 && (
-          <Text color="gray">  [{cmtScroll + 1}/{comments.length}条]</Text>
+        {tab === 'comments' && threads.length > 0 && (
+          <Text color="gray">  [{cmtScroll + 1}/{threads.length}条]</Text>
         )}
       </Box>
     </Box>
